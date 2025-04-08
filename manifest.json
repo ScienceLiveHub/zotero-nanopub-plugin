@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "Nanopublication Linker",
+  "version": "1.0.0",
+  "description": "Redirects to Nanodash to create nanopublications and links them to Zotero items",
+  "author": "Your Name",
+  "applications": {
+    "zotero": {
+      "id": "nanopub-plugin@yourdomain.com",
+      "strict_min_version": "7.0",
+      "strict_max_version": "7.0.*",
+      "update_url": "https://yourdomain.com/updates.json"
+    }
+  }
+}
