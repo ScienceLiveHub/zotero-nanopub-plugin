@@ -1,6 +1,12 @@
 # Zotero Nanopublication Linker
 A Zotero plugin to create nanopublications on Nanodash and link them to bibliography items.
 
+## Create xpi
+
+```
+zip -r ../scienceLive-nanopub-plugin.xpi . -x "*.DS_Store" "*.git*"
+```
+
 ## Installation
 1. Download the `.xpi` file from Releases.
 2. In Zotero, go to Tools > Add-ons, and drag the `.xpi` file into the window.
