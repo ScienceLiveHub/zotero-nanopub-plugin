@@ -1,41 +1,40 @@
-// bootstrap.js - Simple Nanopub Plugin with Template Submenu
+// bootstrap.js - Enhanced Nanopub Plugin with Template-Specific DOI Parameters
 function install(data, reason) {}
 
 function startup(data, reason) {
   Services.console.logStringMessage("Nanopub: startup called");
 
   Zotero.NanopubPlugin = {
-    // Template configuration - easy to modify
+    // Template configuration with placeholder names for DOI parameters
+    // Each template has specific placeholder names - these must match exactly what the template expects
     templates: [
       {
         id: "research_summary",
         name: "📝 Research Summary",
         template: "http://purl.org/np/RAVEpTdLrX5XrhNl_gnvTaBcjRRSDu_hhZix8gu2HO7jI",
-        description: "Commenting on or evaluating a paper (using CiTO)"
+        description: "Commenting on or evaluating a paper (using CiTO)",
+        doiParameterName: "paper"  // to pass the DOI to the nanopublication
       },
       {
-        id: "claim", 
-        name: "💡 Scientific Claim",
+        id: "aida_sentence", 
+        name: "💡 AIDA Sentence",
         template: "https://w3id.org/np/RALmXhDw3rHcMveTgbv8VtWxijUHwnSqhCmtJFIPKWVaA",
-        description: "Make a scientific Claim"
-      },
-      {
-        id: "data_description",
-        name: "📊 Data Description",
-        template: "https://w3id.org/np/RAkLducUzdNR3Hs2aF1iBxPH6nlOn5LfLvuVcSc6MiBqM", 
-        description: "Assert findings from data"
+        description: "Make a scientific claim using AIDA sentence structure",
+        doiParameterName: "publication"  
       },
       {
         id: "citation_link",
         name: "📚 Citation Creation",
         template: "https://w3id.org/np/RAX_4tWTyjFpO6nz63s14ucuejd64t2mK3IBlkwZ7jjLo",
-        description: "Create a citation from a paper"
+        description: "Create a citation from a paper",
+        doiParameterName: "article"  
       },
       {
         id: "browse_templates",
         name: "⚙️  Browse All Templates...",
         template: null,
-        description: "Browse and select from all available nanopublication templates"
+        description: "Browse and select from all available nanopublication templates",
+        doiParameterName: null  // No specific parameter for browsing
       }
     ],
 
@@ -134,26 +133,28 @@ function startup(data, reason) {
       let item = items[0];
       let doi = item.getField("DOI") || "";
 
-      // Build nanodash URL - check if this is the "browse all" option
+      // Build nanodash URL with proper template-specific DOI parameters
       let nanodashUrl;
       if (template.template === null) {
         // For "Browse All Templates", go to the main nanodash page
         nanodashUrl = this.nanodashUrl;
-        // Add DOI as source if available
+        // Add DOI as generic source if available
         if (doi) {
-          nanodashUrl += `?source=${encodeURIComponent(doi)}`;
+          nanodashUrl += `?source=${encodeURIComponent("https://doi.org/" + doi)}`;
         }
       } else {
-        // For specific templates, include template parameter
+        // For specific templates, include template parameter and template-specific DOI parameter
         nanodashUrl = `${this.nanodashUrl}?template=${encodeURIComponent(template.template)}&template-version=latest`;
-        // Add DOI as source if available
-        if (doi) {
-          nanodashUrl += `&source=${encodeURIComponent(doi)}`;
+        
+        // Add DOI as template-specific parameter if both DOI and parameter name are available
+        if (doi && template.doiParameterName) {
+          nanodashUrl += `&param_${template.doiParameterName}=${encodeURIComponent("https://doi.org/" + doi)}`;
         }
       } 
+      
       Services.console.logStringMessage("Nanopub: Opening nanodash URL: " + nanodashUrl);
       
-      // Launch nanodash with the selected template
+      // Launch nanodash with the selected template and DOI parameter
       Zotero.launchURL(nanodashUrl);
 
       // Wait for user to create nanopub and get URL back
@@ -165,11 +166,14 @@ function startup(data, reason) {
         );
         
         if (nanopubUrl && nanopubUrl.startsWith("http")) {
-          // Create note with template information
+          // Create note with template information and DOI details
           let note = new Zotero.Item("note");
           let noteContent = `<h3>Nanopublication: ${template.name}</h3>`;
           noteContent += `<p><strong>Template:</strong> ${template.description}</p>`;
-          noteContent += `<p><strong>URL:</strong> <a href="${nanopubUrl}">${nanopubUrl}</a></p>`;
+          if (doi) {
+            noteContent += `<p><strong>Source DOI:</strong> <a href="https://doi.org/${doi}">${doi}</a></p>`;
+          }
+          noteContent += `<p><strong>Nanopub URL:</strong> <a href="${nanopubUrl}">${nanopubUrl}</a></p>`;
           noteContent += `<p><strong>Created:</strong> ${new Date().toLocaleString()}</p>`;
           
           note.setNote(noteContent);
@@ -178,9 +182,12 @@ function startup(data, reason) {
           // Add tags for organization
           note.addTag(`nanopub:${template.id}`);
           note.addTag("nanopublication");
+          if (doi) {
+            note.addTag(`doi:${doi}`);
+          }
           
           await note.saveTx();
-          Services.console.logStringMessage("Nanopub: note saved with template info");
+          Services.console.logStringMessage("Nanopub: note saved with template info and DOI");
         }
       }, 2000);
     },
