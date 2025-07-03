@@ -1,4 +1,4 @@
-// bootstrap.js - EXACT ORIGINAL CODE with minimal dialog fix
+// bootstrap.js - Simple working version with basic Zotero APIs
 function install(data, reason) {}
 
 function startup(data, reason) {
@@ -162,54 +162,44 @@ function startup(data, reason) {
       
       Zotero.launchURL(nanodashUrl);
 
-      setTimeout(async () => {
-        let nanopubUrl = await Zotero.Utilities.Internal.prompt(
-          "Nanopublication URL",
-          `Paste the URL from Nanodash for "${template.name}":`,
-          ""
-        );
+      setTimeout(() => {
+        // Use basic alert/prompt instead of fancy APIs
+        let nanopubUrl = prompt(`After creating your nanopublication on Nanodash, paste the URL here for "${template.name}":`);
         
         if (nanopubUrl && nanopubUrl.startsWith("http")) {
-          let note = new Zotero.Item("note");
-          let noteContent = `<h3>Nanopublication: ${template.name}</h3>`;
-          noteContent += `<p><strong>Template:</strong> ${template.description}</p>`;
-          if (doi) {
-            noteContent += `<p><strong>Source DOI:</strong> <a href="https://doi.org/${doi}">${doi}</a></p>`;
-          }
-          noteContent += `<p><strong>Nanopub URL:</strong> <a href="${nanopubUrl}">${nanopubUrl}</a></p>`;
-          noteContent += `<p><strong>Created:</strong> ${new Date().toLocaleString()}</p>`;
-          
-          note.setNote(noteContent);
-          note.parentItemID = item.id;
-          
-          note.addTag(`nanopub:${template.id}`);
-          note.addTag("nanopublication");
-          if (doi) {
-            note.addTag(`doi:${doi}`);
-          }
-          
-          await note.saveTx();
-          Services.console.logStringMessage("Nanopub: note saved with template info and DOI");
+          this.saveNanopubNote(item, template, nanopubUrl, doi);
         }
-      }, 2000);
+      }, 3000);
     },
 
-    debugSearchForDOI: async function(doi) {
-      Services.console.logStringMessage("=== NANOPUB DEBUG SEARCH ===");
-      Services.console.logStringMessage("DOI: " + doi);
-      
-      let searchTerms = this.createDOISearchTerms(doi);
-      
-      for (let term of searchTerms) {
-        Services.console.logStringMessage("--- Testing term: " + term + " ---");
-        let results = await this.searchNanopubs(term);
-        Services.console.logStringMessage("Results count: " + results.length);
-        if (results.length > 0) {
-          Services.console.logStringMessage("First result: " + JSON.stringify(results[0]));
+    saveNanopubNote: async function(item, template, nanopubUrl, doi) {
+      try {
+        let note = new Zotero.Item("note");
+        let noteContent = `<h3>Nanopublication: ${template.name}</h3>`;
+        noteContent += `<p><strong>Template:</strong> ${template.description}</p>`;
+        if (doi) {
+          noteContent += `<p><strong>Source DOI:</strong> <a href="https://doi.org/${doi}">${doi}</a></p>`;
         }
+        noteContent += `<p><strong>Nanopub URL:</strong> <a href="${nanopubUrl}">${nanopubUrl}</a></p>`;
+        noteContent += `<p><strong>Created:</strong> ${new Date().toLocaleString()}</p>`;
+        
+        note.setNote(noteContent);
+        note.parentItemID = item.id;
+        
+        note.addTag(`nanopub:${template.id}`);
+        note.addTag("nanopublication");
+        if (doi) {
+          note.addTag(`doi:${doi}`);
+        }
+        
+        await note.saveTx();
+        Services.console.logStringMessage("Nanopub: note saved with template info and DOI");
+        
+        Zotero.getMainWindow().alert("Nanopublication note saved successfully!");
+      } catch (error) {
+        Services.console.logStringMessage("Nanopub: Error saving note: " + error.message);
+        Zotero.getMainWindow().alert("Error saving nanopublication note: " + error.message);
       }
-      
-      Services.console.logStringMessage("=== END DEBUG SEARCH ===");
     },
 
     searchNanopubsForSelectedItem: async function() {
@@ -224,12 +214,7 @@ function startup(data, reason) {
 
       let item = items[0];
       let doi = item.getField("DOI");
-      
-      if (Services.prefs.getBoolPref("extensions.zotero.nanopub.debug", false)) {
-        if (doi) {
-          await this.debugSearchForDOI(doi);
-        }
-      }
+      let title = item.getField("title");
       
       try {
         let progressWindow = new Zotero.ProgressWindow();
@@ -245,14 +230,15 @@ function startup(data, reason) {
           let message = 'No related nanopublications found for this item.';
           if (doi) {
             message += `\n\nSearched for DOI: ${doi}`;
-            message += '\n\nTo enable debug mode, go to Zotero preferences and add this setting:';
-            message += '\nextensions.zotero.nanopub.debug = true';
           }
+          if (title) {
+            message += `\nSearched for title: ${title}`;
+          }
+          message += '\n\nThis is a basic search implementation. The nanopub search infrastructure is still being developed.';
           Zotero.getMainWindow().alert(message);
           return;
         }
 
-        // ONLY CHANGE: Simple selection instead of complex XUL dialog
         let selectedNanopubs = await this.showNanopubSelectionDialog(nanopubs);
         
         if (selectedNanopubs.length > 0) {
@@ -272,7 +258,7 @@ function startup(data, reason) {
       let doi = item.getField("DOI");
       if (doi) {
         Services.console.logStringMessage("Nanopub: searching for DOI: " + doi);
-        let doiResults = await this.searchByDOI(doi);
+        let doiResults = await this.basicSearchForTerm(doi);
         results.push(...doiResults);
         Services.console.logStringMessage("Nanopub: found " + doiResults.length + " nanopubs mentioning DOI");
       }
@@ -281,7 +267,7 @@ function startup(data, reason) {
         let title = item.getField("title");
         if (title) {
           Services.console.logStringMessage("Nanopub: searching for title: " + title);
-          let titleResults = await this.searchByTitle(title);
+          let titleResults = await this.basicSearchForTerm(title);
           results.push(...titleResults);
           Services.console.logStringMessage("Nanopub: found " + titleResults.length + " nanopubs mentioning title");
         }
@@ -290,122 +276,141 @@ function startup(data, reason) {
       return this.removeDuplicates(results);
     },
 
-    searchByDOI: async function(doi) {
-      let doiSearchTerms = this.createDOISearchTerms(doi);
+    basicSearchForTerm: async function(searchTerm) {
       let results = [];
       
-      for (let term of doiSearchTerms) {
-        try {
-          let nanopubs = await this.searchNanopubs(term);
-          results.push(...nanopubs);
-          Services.console.logStringMessage("Nanopub: DOI search term '" + term + "' found " + nanopubs.length + " results");
-        } catch (error) {
-          Services.console.logStringMessage('Error searching for DOI term "' + term + '": ' + error.message);
-        }
+      // Clean DOI for search
+      let cleanTerm = searchTerm;
+      if (searchTerm.includes("doi.org")) {
+        cleanTerm = searchTerm.replace(/^(https?:\/\/)?(dx\.)?doi\.org\//, '');
       }
       
-      return results;
-    },
-
-    createDOISearchTerms: function(doi) {
-      let terms = [];
-      let cleanDoi = doi.replace(/^(https?:\/\/)?(dx\.)?doi\.org\//, '');
-      
-      terms.push(`"${cleanDoi}"`);
-      terms.push(`"https://doi.org/${cleanDoi}"`);
-      terms.push(`"http://dx.doi.org/${cleanDoi}"`);
-      terms.push(`"doi:${cleanDoi}"`);
-      terms.push(`"DOI:${cleanDoi}"`);
-      terms.push(cleanDoi);
-      
-      Services.console.logStringMessage("Nanopub: created DOI search terms: " + terms.join(', '));
-      return terms;
-    },
-
-    searchByTitle: async function(title) {
-      let results = [];
-      
-      try {
-        let exactResults = await this.searchNanopubs(`"${title}"`);
-        results.push(...exactResults);
-        
-        if (title.length > 50) {
-          let shortTitle = title.substring(0, 50).trim();
-          let shortResults = await this.searchNanopubs(`"${shortTitle}"`);
-          results.push(...shortResults);
-        }
-        
-      } catch (error) {
-        Services.console.logStringMessage('Error in title search: ' + error.message);
-      }
-      
-      return results;
-    },
-
-    searchNanopubs: async function(searchTerm) {
-      let encodedTerm = encodeURIComponent(searchTerm);
-      
+      // Use the correct nanopub query endpoints
       let endpoints = [
-        `http://grlc.nanopubs.lod.labs.vu.nl/api/local/local/find_nanopubs_with_text?text=${encodedTerm}`,
-        `http://grlc.nanopubs.lod.labs.vu.nl/api/local/local/find_nanopubs_with_text?text=${encodedTerm}&graphpred=ALL`,
-        `http://grlc.nanopubs.lod.labs.vu.nl/api/local/local/find_nanopubs_with_pattern?subj=&pred=&obj=${encodedTerm}`,
+        "https://query.knowledgepixels.com/repo/full",
+        "https://query.knowledgepixels.com/repo/text", 
+        "https://query.knowledgepixels.com/repo/last30d"
       ];
       
-      Services.console.logStringMessage("Nanopub: searching with term: " + searchTerm);
-      
-      for (let url of endpoints) {
-        try {
-          Services.console.logStringMessage("Nanopub: trying endpoint: " + url);
+      // Create SPARQL query to search for the term
+      let sparqlQuery = `
+        PREFIX np: <http://www.nanopub.org/nschema#>
+        PREFIX npa: <http://purl.org/nanopub/admin/>
+        PREFIX prov: <http://www.w3.org/ns/prov#>
+        PREFIX dcterms: <http://purl.org/dc/terms/>
+        
+        SELECT DISTINCT ?np ?date ?pubkey ?assertion ?provenance
+        WHERE {
+          ?np a np:Nanopublication ;
+              np:hasAssertion ?assertion ;
+              np:hasProvenance ?provenance .
           
-          let response = await fetch(url, {
-            method: 'GET',
-            headers: { 
-              'Accept': 'application/json',
-              'User-Agent': 'Zotero-Nanopub-Plugin/1.0'
+          # Search in assertion graph
+          GRAPH ?assertion {
+            ?s ?p ?o .
+            FILTER (
+              CONTAINS(LCASE(STR(?s)), LCASE("${cleanTerm}")) ||
+              CONTAINS(LCASE(STR(?p)), LCASE("${cleanTerm}")) ||
+              CONTAINS(LCASE(STR(?o)), LCASE("${cleanTerm}"))
+            )
+          }
+          
+          # Get metadata from admin graph
+          OPTIONAL {
+            GRAPH ?provenance {
+              ?np dcterms:created ?date .
             }
+          }
+          
+          OPTIONAL {
+            GRAPH npa:graph {
+              ?np npa:hasValidSignatureForPublicKey ?pubkey .
+            }
+          }
+        }
+        ORDER BY DESC(?date)
+        LIMIT 20
+      `;
+      
+      for (let endpoint of endpoints) {
+        try {
+          Services.console.logStringMessage(`Nanopub: trying SPARQL endpoint: ${endpoint}`);
+          
+          let response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Accept': 'application/sparql-results+json'
+            },
+            body: 'query=' + encodeURIComponent(sparqlQuery)
           });
           
           if (!response.ok) {
-            Services.console.logStringMessage(`Nanopub: endpoint failed with status ${response.status}: ${url}`);
+            Services.console.logStringMessage(`Nanopub: SPARQL endpoint failed with status ${response.status}: ${endpoint}`);
             continue;
           }
           
           let data = await response.json();
-          let results = this.processNanopubResults(data);
+          let searchResults = this.processSearchResults(data);
           
-          if (results.length > 0) {
-            Services.console.logStringMessage(`Nanopub: found ${results.length} results with endpoint: ${url}`);
-            return results;
+          if (searchResults.length > 0) {
+            Services.console.logStringMessage(`Nanopub: found ${searchResults.length} results with endpoint: ${endpoint}`);
+            results.push(...searchResults);
+            break; // Use first successful endpoint
           }
           
         } catch (error) {
-          Services.console.logStringMessage(`Nanopub: error with endpoint ${url}: ${error.message}`);
+          Services.console.logStringMessage(`Nanopub: error with endpoint ${endpoint}: ${error.message}`);
           continue;
         }
       }
       
-      Services.console.logStringMessage("Nanopub: no results found with any endpoint for term: " + searchTerm);
-      return [];
+      // Fallback to old endpoints if nanopub query doesn't work
+      if (results.length === 0) {
+        Services.console.logStringMessage("Nanopub: trying fallback endpoints");
+        let fallbackEndpoints = [
+          `http://grlc.nanopubs.lod.labs.vu.nl/api/local/local/find_nanopubs_with_text?text=${encodeURIComponent(cleanTerm)}`,
+          `http://grlc.nanopubs.lod.labs.vu.nl/api/local/local/find_nanopubs_with_pattern?subj=&pred=&obj=${encodeURIComponent(cleanTerm)}`
+        ];
+        
+        for (let endpoint of fallbackEndpoints) {
+          try {
+            Services.console.logStringMessage(`Nanopub: trying fallback endpoint: ${endpoint}`);
+            
+            let response = await fetch(endpoint, {
+              method: 'GET',
+              headers: { 
+                'Accept': 'application/json',
+                'User-Agent': 'Zotero-Nanopub-Plugin/1.0'
+              }
+            });
+            
+            if (!response.ok) {
+              Services.console.logStringMessage(`Nanopub: fallback endpoint failed with status ${response.status}: ${endpoint}`);
+              continue;
+            }
+            
+            let data = await response.json();
+            let searchResults = this.processSearchResults(data);
+            
+            if (searchResults.length > 0) {
+              Services.console.logStringMessage(`Nanopub: found ${searchResults.length} results with fallback endpoint: ${endpoint}`);
+              results.push(...searchResults);
+              break;
+            }
+            
+          } catch (error) {
+            Services.console.logStringMessage(`Nanopub: error with fallback endpoint ${endpoint}: ${error.message}`);
+            continue;
+          }
+        }
+      }
+      
+      return results;
     },
 
-    createDOISearchTerms: function(doi) {
-      let terms = [];
-      let cleanDoi = doi.replace(/^(https?:\/\/)?(dx\.)?doi\.org\//, '');
-      
-      terms.push(`https://doi.org/${cleanDoi}`);
-      terms.push(`http://dx.doi.org/${cleanDoi}`);
-      terms.push(`doi:${cleanDoi}`);
-      terms.push(`DOI:${cleanDoi}`);
-      terms.push(cleanDoi);
-      terms.push(`"https://doi.org/${cleanDoi}"`);
-      terms.push(`"${cleanDoi}"`);
-      
-      Services.console.logStringMessage("Nanopub: created DOI search terms: " + terms.join(', '));
-      return terms;
-    },
-
-    processNanopubResults: function(data) {
-      Services.console.logStringMessage("Nanopub: processing results: " + JSON.stringify(data));
+    processSearchResults: function(data) {
+      Services.console.logStringMessage("Nanopub: processing search results");
       
       if (!data) {
         Services.console.logStringMessage("Nanopub: no data received");
@@ -414,17 +419,23 @@ function startup(data, reason) {
       
       let results = [];
       
+      // Handle different response formats
       if (data.results && data.results.bindings) {
+        // SPARQL results format from nanopub query
         results = data.results.bindings.map(binding => ({
-          uri: binding.np?.value || binding.nanopub?.value || '',
-          subject: binding.subj?.value || binding.s?.value || '',
-          predicate: binding.pred?.value || binding.p?.value || '',
-          object: binding.obj?.value || binding.o?.value || binding.v?.value || '',
-          date: binding.date?.value || binding.created?.value || '',
-          pubkey: binding.pubkey?.value || binding.creator?.value || '',
-          graph: binding.graph?.value || binding.g?.value || ''
+          uri: binding.np?.value || '',
+          assertion: binding.assertion?.value || '',
+          provenance: binding.provenance?.value || '',
+          date: binding.date?.value || '',
+          pubkey: binding.pubkey?.value || '',
+          // For compatibility with existing code
+          subject: binding.assertion?.value || '',
+          predicate: 'np:hasAssertion',
+          object: binding.np?.value || '',
+          graph: binding.assertion?.value || ''
         }));
       } else if (Array.isArray(data)) {
+        // Array format from fallback endpoints
         results = data.map(item => ({
           uri: item.np || item.nanopub || item.uri || '',
           subject: item.subj || item.s || '',
@@ -435,7 +446,7 @@ function startup(data, reason) {
           graph: item.graph || item.g || ''
         }));
       } else {
-        Services.console.logStringMessage("Nanopub: unexpected data format: " + JSON.stringify(data));
+        Services.console.logStringMessage("Nanopub: unexpected data format");
         return [];
       }
       
@@ -448,13 +459,13 @@ function startup(data, reason) {
     removeDuplicates: function(nanopubs) {
       let seen = new Set();
       return nanopubs.filter(nanopub => {
-        if (seen.has(nanopub.uri)) return false;
-        seen.add(nanopub.uri);
+        let key = nanopub.uri || nanopub.subject;
+        if (seen.has(key)) return false;
+        seen.add(key);
         return true;
       });
     },
 
-    // BACK TO WORKING CONFIRM DIALOGS (but improved)
     showNanopubSelectionDialog: async function(nanopubs) {
       Services.console.logStringMessage("Nanopub: showNanopubSelectionDialog called with " + nanopubs.length + " nanopubs");
       
@@ -462,13 +473,11 @@ function startup(data, reason) {
       
       // First show overview
       let overviewMessage = `Found ${nanopubs.length} nanopublications related to your paper.\n\n`;
-      overviewMessage += `I'll show you each one so you can choose which to attach.\n\n`;
-      overviewMessage += `Click OK to start selecting, or Cancel to attach all.`;
+      overviewMessage += `Click OK to attach all, or Cancel to select individually.`;
       
-      let startSelection = Zotero.getMainWindow().confirm(overviewMessage);
+      let attachAll = Zotero.getMainWindow().confirm(overviewMessage);
       
-      if (!startSelection) {
-        // User chose Cancel = attach all
+      if (attachAll) {
         Services.console.logStringMessage("Nanopub: User chose to attach all nanopubs");
         return nanopubs;
       }
@@ -480,6 +489,10 @@ function startup(data, reason) {
         
         let message = `Nanopublication ${i + 1} of ${nanopubs.length}\n\n`;
         message += `URI: ${shortUri}\n\n`;
+        
+        if (nanopub.assertion) {
+          message += `Assertion: ${this.cleanUriForDisplay(nanopub.assertion)}\n\n`;
+        }
         
         if (nanopub.subject && nanopub.predicate && nanopub.object) {
           let subject = this.cleanUriForDisplay(nanopub.subject);
@@ -501,7 +514,11 @@ function startup(data, reason) {
           }
         }
         
-        message += `Do you want to attach this nanopublication?\n\n`;
+        if (nanopub.pubkey) {
+          message += `Publisher: ${this.cleanUriForDisplay(nanopub.pubkey)}\n\n`;
+        }
+        
+        message += `Attach this nanopublication?\n\n`;
         message += `(OK = Yes, Cancel = No)`;
         
         let result = Zotero.getMainWindow().confirm(message);
@@ -511,19 +528,11 @@ function startup(data, reason) {
         }
       }
       
-      // Show final summary
-      let summaryMessage = `Selection complete!\n\n`;
-      summaryMessage += `You selected ${selected.length} out of ${nanopubs.length} nanopublications.\n\n`;
-      summaryMessage += selected.length > 0 ? `These will be attached as notes to your Zotero item.` : `No nanopublications will be attached.`;
-      
-      Zotero.getMainWindow().alert(summaryMessage);
-      
       Services.console.logStringMessage("Nanopub: User selected " + selected.length + " out of " + nanopubs.length + " nanopubs");
       
       return selected;
     },
 
-    // Helper function for cleaning URIs
     cleanUriForDisplay: function(uri) {
       if (!uri) return '';
       if (uri.startsWith('http://') || uri.startsWith('https://')) {
@@ -544,15 +553,26 @@ function startup(data, reason) {
         try {
           let noteContent = `<div>
             <h3>Related Nanopublication</h3>
-            <p><strong>URI:</strong> <a href="${nanopub.uri}">${nanopub.uri}</a></p>
-            <p><strong>Statement:</strong> ${nanopub.subject} ${nanopub.predicate} ${nanopub.object}</p>`;
+            <p><strong>URI:</strong> <a href="${nanopub.uri}">${nanopub.uri}</a></p>`;
+          
+          if (nanopub.assertion) {
+            noteContent += `<p><strong>Assertion:</strong> <a href="${nanopub.assertion}">${nanopub.assertion}</a></p>`;
+          }
+          
+          if (nanopub.provenance) {
+            noteContent += `<p><strong>Provenance:</strong> <a href="${nanopub.provenance}">${nanopub.provenance}</a></p>`;
+          }
+          
+          if (nanopub.subject && nanopub.predicate && nanopub.object) {
+            noteContent += `<p><strong>Statement:</strong> ${nanopub.subject} ${nanopub.predicate} ${nanopub.object}</p>`;
+          }
           
           if (nanopub.date) {
             noteContent += `<p><strong>Date:</strong> ${nanopub.date}</p>`;
           }
           
           if (nanopub.pubkey) {
-            noteContent += `<p><strong>Publisher:</strong> ${nanopub.pubkey}</p>`;
+            noteContent += `<p><strong>Publisher Key:</strong> ${nanopub.pubkey}</p>`;
           }
           
           noteContent += `<p><strong>Found:</strong> ${new Date().toLocaleString()}</p>
