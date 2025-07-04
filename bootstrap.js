@@ -1,4 +1,4 @@
-// bootstrap.js - Nanopublication Zotero plugin
+// bootstrap.js - Enhanced version with improved nanopub display
 function install(data, reason) {}
 
 function startup(data, reason) {
@@ -11,28 +11,36 @@ function startup(data, reason) {
         name: "📝 Research Summary",
         template: "http://purl.org/np/RAVEpTdLrX5XrhNl_gnvTaBcjRRSDu_hhZix8gu2HO7jI",
         description: "Commenting on or evaluating a paper (using CiTO)",
-        doiParameterName: "paper"
+        doiParameterName: "paper",
+        namespace: "cito",
+        contentType: "Citation"
       },
       {
         id: "aida_sentence", 
         name: "💡 AIDA Sentence",
         template: "https://w3id.org/np/RALmXhDw3rHcMveTgbv8VtWxijUHwnSqhCmtJFIPKWVaA",
         description: "Make a scientific claim using AIDA sentence structure",
-        doiParameterName: "publication"  
+        doiParameterName: "publication",
+        namespace: "aida",
+        contentType: "AIDA Sentence"
       },
       {
         id: "citation_link",
         name: "📚 Citation Creation",
         template: "https://w3id.org/np/RAX_4tWTyjFpO6nz63s14ucuejd64t2mK3IBlkwZ7jjLo",
         description: "Create a citation from a paper",
-        doiParameterName: "article"  
+        doiParameterName: "article",
+        namespace: "cito",
+        contentType: "Citation"
       },
       {
         id: "browse_templates",
         name: "⚙️  Browse All Templates...",
         template: null,
         description: "Browse and select from all available nanopublication templates",
-        doiParameterName: null
+        doiParameterName: null,
+        namespace: null,
+        contentType: "Content"
       }
     ],
 
@@ -746,28 +754,14 @@ function startup(data, reason) {
     },
 
     getContentTypeFromNamespace: function(namespace) {
-      let namespaceMap = {
-        'aida': 'AIDA Sentence',
-        'cito': 'Citation',
-        'claim': 'Claim',
-        'hypothesis': 'Hypothesis',
-        'statement': 'Statement',
-        'assertion': 'Assertion',
-        'opinion': 'Opinion',
-        'review': 'Review',
-        'summary': 'Summary',
-        'conclusion': 'Conclusion',
-        'observation': 'Observation',
-        'finding': 'Finding',
-        'result': 'Result'
-      };
-      
-      for (let [key, value] of Object.entries(namespaceMap)) {
-        if (namespace && namespace.toLowerCase().includes(key)) {
-          return value;
+      // First check if we have this namespace in our known templates
+      for (let template of this.templates) {
+        if (template.namespace && template.namespace.toLowerCase() === namespace.toLowerCase()) {
+          return template.contentType;
         }
       }
       
+      // Fallback: clean up the namespace and capitalize
       if (namespace) {
         return namespace.charAt(0).toUpperCase() + namespace.slice(1).replace(/[-_]/g, ' ');
       }
