@@ -1,4 +1,4 @@
-// bootstrap.js - Enhanced version with improved nanopub display
+// bootstrap.js - Enhanced version with ORCID support for nanopub creation
 function install(data, reason) {}
 
 function startup(data, reason) {
@@ -136,7 +136,7 @@ function startup(data, reason) {
       menu.appendChild(createMenu);
       menu.appendChild(searchMenuItem);
       
-      Services.console.logStringMessage("Nanopub: added create menu with " + this.templates.length + " templates and separate search menu");
+      Services.console.logStringMessage("Nanopub: added create menu with " + this.templates.length + " templates and search menu");
     },
 
     createNanopub: async function(template) {
@@ -302,8 +302,9 @@ function startup(data, reason) {
         PREFIX npa: <http://purl.org/nanopub/admin/>
         PREFIX prov: <http://www.w3.org/ns/prov#>
         PREFIX dcterms: <http://purl.org/dc/terms/>
+        PREFIX foaf: <http://xmlns.com/foaf/0.1/>
         
-        SELECT DISTINCT ?np ?date ?pubkey ?assertion ?provenance
+        SELECT DISTINCT ?np ?date ?pubkey ?assertion ?provenance ?orcid ?authorName
         WHERE {
           ?np a np:Nanopublication ;
               np:hasAssertion ?assertion ;
@@ -321,6 +322,10 @@ function startup(data, reason) {
           OPTIONAL {
             GRAPH ?provenance {
               ?np dcterms:created ?date .
+              ?np dcterms:creator ?creator .
+              ?creator foaf:name ?authorName .
+              FILTER(CONTAINS(STR(?creator), "orcid.org"))
+              BIND(STRAFTER(STR(?creator), "orcid.org/") AS ?orcid)
             }
           }
           
@@ -427,6 +432,8 @@ function startup(data, reason) {
           provenance: binding.provenance?.value || '',
           date: binding.date?.value || '',
           pubkey: binding.pubkey?.value || '',
+          orcid: binding.orcid?.value || '',
+          authorName: binding.authorName?.value || '',
           subject: binding.assertion?.value || '',
           predicate: 'np:hasAssertion',
           object: binding.np?.value || '',
@@ -440,6 +447,8 @@ function startup(data, reason) {
           object: item.obj || item.o || item.v || '',
           date: item.date || item.created || '',
           pubkey: item.pubkey || item.creator || '',
+          orcid: item.orcid || '',
+          authorName: item.authorName || '',
           graph: item.graph || item.g || ''
         }));
       } else {
@@ -485,6 +494,16 @@ function startup(data, reason) {
         let message = `Nanopublication ${i + 1} of ${nanopubs.length}\n\n`;
         message += `URI: ${shortUri}\n\n`;
         
+        if (nanopub.authorName) {
+          message += `Author: ${nanopub.authorName}`;
+          if (nanopub.orcid) {
+            message += ` (ORCID: ${nanopub.orcid})`;
+          }
+          message += `\n\n`;
+        } else if (nanopub.orcid) {
+          message += `Author ORCID: ${nanopub.orcid}\n\n`;
+        }
+        
         if (nanopub.assertion) {
           message += `Assertion: ${this.cleanUriForDisplay(nanopub.assertion)}\n\n`;
         }
@@ -507,10 +526,6 @@ function startup(data, reason) {
           } catch (e) {
             // ignore date formatting errors
           }
-        }
-        
-        if (nanopub.pubkey) {
-          message += `Publisher: ${this.cleanUriForDisplay(nanopub.pubkey)}\n\n`;
         }
         
         message += `Attach this nanopublication?\n\n`;
@@ -591,6 +606,14 @@ function startup(data, reason) {
       try {
         Services.console.logStringMessage(`Nanopub: parsing content of length ${content.length}`);
         
+        // Debug: Let's see what lines contain "Anne" or "orcid" 
+        let debugLines = content.split('\n');
+        debugLines.forEach((line, idx) => {
+          if (line.toLowerCase().includes('anne') || line.toLowerCase().includes('orcid')) {
+            Services.console.logStringMessage(`Debug line ${idx}: ${line}`);
+          }
+        });
+        
         let contentUriMatches = content.match(/<http:\/\/purl\.org\/[^\/]+\/([^>]+)>/g);
         if (contentUriMatches) {
           Services.console.logStringMessage(`Nanopub: found ${contentUriMatches.length} content URIs`);
@@ -624,17 +647,6 @@ function startup(data, reason) {
           });
         }
         
-        let imagenetLines = content.split('\n').filter(line => 
-          line.toLowerCase().includes('imagenet') || 
-          line.includes('3.2-million') ||
-          line.includes('99.7%')
-        );
-        
-        Services.console.logStringMessage(`Nanopub: found ${imagenetLines.length} ImageNet-related lines`);
-        imagenetLines.forEach((line, idx) => {
-          Services.console.logStringMessage(`Nanopub: ImageNet line ${idx}: "${line}"`);
-        });
-        
         let lines = content.split('\n');
         let assertionLines = [];
         let provenanceLines = [];
@@ -663,9 +675,6 @@ function startup(data, reason) {
           
           if (inAssertion && line && !line.startsWith('#')) {
             assertionLines.push(line);
-            if (line.toLowerCase().includes('imagenet')) {
-              Services.console.logStringMessage(`Nanopub: assertion line with ImageNet: "${line}"`);
-            }
           } else if (inProvenance && line && !line.startsWith('#')) {
             provenanceLines.push(line);
           }
@@ -692,7 +701,17 @@ function startup(data, reason) {
               details.author = match[1];
               if (match[1].includes('orcid.org')) {
                 details.orcid = match[1].split('/').pop();
+                Services.console.logStringMessage(`Nanopub: found ORCID: ${details.orcid}`);
               }
+            }
+          }
+          
+          // Look for ORCID in any line containing orcid.org
+          if (line.includes('orcid.org') && !details.orcid) {
+            let orcidMatch = line.match(/orcid\.org\/([0-9\-X]+)/i);
+            if (orcidMatch) {
+              details.orcid = orcidMatch[1];
+              Services.console.logStringMessage(`Nanopub: found ORCID in line: ${details.orcid}`);
             }
           }
           
@@ -700,6 +719,7 @@ function startup(data, reason) {
             let match = line.match(/"([^"]+)"/);
             if (match) {
               details.authorName = match[1];
+              Services.console.logStringMessage(`Nanopub: found author name: "${details.authorName}"`);
             }
           }
           
@@ -737,14 +757,31 @@ function startup(data, reason) {
         
         if (provenanceLines.length > 0) {
           let provenanceInfo = this.extractProvenanceInfo(provenanceLines);
-          if (provenanceInfo.authorName) details.authorName = provenanceInfo.authorName;
-          if (provenanceInfo.orcid) details.orcid = provenanceInfo.orcid;
+          if (provenanceInfo.authorName && !details.authorName) details.authorName = provenanceInfo.authorName;
+          if (provenanceInfo.orcid && !details.orcid) details.orcid = provenanceInfo.orcid;
+        }
+        
+        // Also scan the entire content for any ORCID patterns if we still don't have one
+        if (!details.orcid) {
+          // Look for standard ORCID patterns like 0000-0002-1784-2920
+          let orcidMatches = content.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b/g);
+          if (orcidMatches && orcidMatches.length > 0) {
+            details.orcid = orcidMatches[0];
+            Services.console.logStringMessage(`Nanopub: found ORCID pattern in content: ${details.orcid}`);
+          } else {
+            // Also try to find orcid.org URLs
+            let orcidUrlMatches = content.match(/orcid\.org\/([0-9\-X]+)/gi);
+            if (orcidUrlMatches && orcidUrlMatches.length > 0) {
+              let orcidMatch = orcidUrlMatches[0].match(/orcid\.org\/([0-9\-X]+)/i);
+              if (orcidMatch) {
+                details.orcid = orcidMatch[1];
+                Services.console.logStringMessage(`Nanopub: found ORCID URL in content: ${details.orcid}`);
+              }
+            }
+          }
         }
         
         Services.console.logStringMessage(`Nanopub: final parsed details - title: ${details.title}, authorName: ${details.authorName}, orcid: ${details.orcid}, contentItems: ${details.contentItems.length}`);
-        details.contentItems.forEach((item, idx) => {
-          Services.console.logStringMessage(`Nanopub: content item ${idx}: type="${item.type}", content length=${item.content.length}`);
-        });
         
       } catch (error) {
         Services.console.logStringMessage(`Error parsing nanopub content: ${error.message}`);
@@ -780,10 +817,30 @@ function startup(data, reason) {
           }
         }
         
+        // More comprehensive ORCID extraction
         if (line.includes('orcid.org')) {
-          let match = line.match(/orcid\.org\/([0-9\-]+)/);
+          let match = line.match(/orcid\.org\/([0-9\-X]+)/i);
           if (match) {
             info.orcid = match[1];
+            Services.console.logStringMessage(`Nanopub: extracted ORCID from provenance: ${info.orcid}`);
+          }
+        }
+        
+        // Look for standalone ORCID patterns (like 0000-0002-1784-2920)
+        if (!info.orcid) {
+          let orcidPattern = line.match(/\b(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])\b/);
+          if (orcidPattern) {
+            info.orcid = orcidPattern[1];
+            Services.console.logStringMessage(`Nanopub: extracted ORCID pattern from provenance: ${info.orcid}`);
+          }
+        }
+        
+        // Also check for ORCID in creator fields
+        if ((line.includes('dcterms:creator') || line.includes('pav:createdBy')) && line.includes('orcid.org')) {
+          let match = line.match(/orcid\.org\/([0-9\-X]+)/i);
+          if (match) {
+            info.orcid = match[1];
+            Services.console.logStringMessage(`Nanopub: extracted ORCID from creator field: ${info.orcid}`);
           }
         }
         
@@ -986,17 +1043,15 @@ function startup(data, reason) {
         content += `</div>`;
       }
       
-      content += `<h4 style="margin: 16px 0 4px 0;">Author & Provenance</h4>`;
+      content += `<h4 style="margin: 16px 0 4px 0;">Provenance</h4>`;
       content += `<div style="padding: 12px; border: 1px solid; border-radius: 6px; margin-bottom: 12px;">`;
       
       if (details?.authorName) {
-        content += `<p style="margin: 0 0 6px 0;"><strong>Author:</strong> ${details.authorName}`;
-        if (details.orcid) {
-          content += ` <em>(ORCID: ${details.orcid})</em>`;
-        }
-        content += `</p>`;
-      } else if (details?.orcid) {
-        content += `<p style="margin: 0 0 6px 0;"><strong>Author:</strong> <em>ORCID: ${details.orcid}</em></p>`;
+        content += `<p style="margin: 0 0 6px 0;"><strong>Author:</strong> ${details.authorName}</p>`;
+      }
+      
+      if (details?.orcid) {
+        content += `<p style="margin: 0 0 6px 0;"><strong>ORCID:</strong> <a href="https://orcid.org/${details.orcid}" target="_blank">${details.orcid}</a></p>`;
       }
       
       if (details?.type) {
@@ -1054,6 +1109,10 @@ function startup(data, reason) {
           
           if (details?.authorName) {
             note.addTag(`author:${details.authorName.toLowerCase()}`);
+          }
+          
+          if (details?.orcid) {
+            note.addTag(`orcid:${details.orcid}`);
           }
           
           await note.saveTx();
