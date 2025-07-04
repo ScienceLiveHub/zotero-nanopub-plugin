@@ -1,4 +1,4 @@
-// bootstrap.js - Simple working version with basic Zotero APIs
+// bootstrap.js - Nanopublication Zotero plugin
 function install(data, reason) {}
 
 function startup(data, reason) {
@@ -163,7 +163,6 @@ function startup(data, reason) {
       Zotero.launchURL(nanodashUrl);
 
       setTimeout(() => {
-        // Use basic alert/prompt instead of fancy APIs
         let nanopubUrl = prompt(`After creating your nanopublication on Nanodash, paste the URL here for "${template.name}":`);
         
         if (nanopubUrl && nanopubUrl.startsWith("http")) {
@@ -279,20 +278,17 @@ function startup(data, reason) {
     basicSearchForTerm: async function(searchTerm) {
       let results = [];
       
-      // Clean DOI for search
       let cleanTerm = searchTerm;
       if (searchTerm.includes("doi.org")) {
         cleanTerm = searchTerm.replace(/^(https?:\/\/)?(dx\.)?doi\.org\//, '');
       }
       
-      // Use the correct nanopub query endpoints
       let endpoints = [
         "https://query.knowledgepixels.com/repo/full",
         "https://query.knowledgepixels.com/repo/text", 
         "https://query.knowledgepixels.com/repo/last30d"
       ];
       
-      // Create SPARQL query to search for the term
       let sparqlQuery = `
         PREFIX np: <http://www.nanopub.org/nschema#>
         PREFIX npa: <http://purl.org/nanopub/admin/>
@@ -305,7 +301,6 @@ function startup(data, reason) {
               np:hasAssertion ?assertion ;
               np:hasProvenance ?provenance .
           
-          # Search in assertion graph
           GRAPH ?assertion {
             ?s ?p ?o .
             FILTER (
@@ -315,7 +310,6 @@ function startup(data, reason) {
             )
           }
           
-          # Get metadata from admin graph
           OPTIONAL {
             GRAPH ?provenance {
               ?np dcterms:created ?date .
@@ -356,7 +350,7 @@ function startup(data, reason) {
           if (searchResults.length > 0) {
             Services.console.logStringMessage(`Nanopub: found ${searchResults.length} results with endpoint: ${endpoint}`);
             results.push(...searchResults);
-            break; // Use first successful endpoint
+            break;
           }
           
         } catch (error) {
@@ -365,7 +359,6 @@ function startup(data, reason) {
         }
       }
       
-      // Fallback to old endpoints if nanopub query doesn't work
       if (results.length === 0) {
         Services.console.logStringMessage("Nanopub: trying fallback endpoints");
         let fallbackEndpoints = [
@@ -419,23 +412,19 @@ function startup(data, reason) {
       
       let results = [];
       
-      // Handle different response formats
       if (data.results && data.results.bindings) {
-        // SPARQL results format from nanopub query
         results = data.results.bindings.map(binding => ({
           uri: binding.np?.value || '',
           assertion: binding.assertion?.value || '',
           provenance: binding.provenance?.value || '',
           date: binding.date?.value || '',
           pubkey: binding.pubkey?.value || '',
-          // For compatibility with existing code
           subject: binding.assertion?.value || '',
           predicate: 'np:hasAssertion',
           object: binding.np?.value || '',
           graph: binding.assertion?.value || ''
         }));
       } else if (Array.isArray(data)) {
-        // Array format from fallback endpoints
         results = data.map(item => ({
           uri: item.np || item.nanopub || item.uri || '',
           subject: item.subj || item.s || '',
@@ -471,7 +460,6 @@ function startup(data, reason) {
       
       let selected = [];
       
-      // First show overview
       let overviewMessage = `Found ${nanopubs.length} nanopublications related to your paper.\n\n`;
       overviewMessage += `Click OK to attach all, or Cancel to select individually.`;
       
@@ -482,7 +470,6 @@ function startup(data, reason) {
         return nanopubs;
       }
       
-      // Show each nanopub for individual selection
       for (let i = 0; i < nanopubs.length; i++) {
         let nanopub = nanopubs[i];
         let shortUri = nanopub.uri.split('/').pop();
@@ -548,49 +535,554 @@ function startup(data, reason) {
       return uri;
     },
 
-    attachNanopubsToItem: async function(item, nanopubs) {
-      for (let nanopub of nanopubs) {
+    fetchNanopubDetails: async function(nanopubUri) {
+      try {
+        Services.console.logStringMessage(`Nanopub: fetching ${nanopubUri}`);
+        
+        let response = await fetch(nanopubUri + '.trig', {
+          headers: { 'Accept': 'application/trig' }
+        });
+        
+        if (response.ok) {
+          let content = await response.text();
+          Services.console.logStringMessage(`Nanopub: got ${content.length} characters`);
+          
+          let allQuotes = content.match(/"[^"]*"/g) || [];
+          Services.console.logStringMessage(`Nanopub: found ${allQuotes.length} quoted strings`);
+          
+          allQuotes.forEach((quote, idx) => {
+            if (quote.length > 50) {
+              Services.console.logStringMessage(`Quote ${idx}: ${quote}`);
+            }
+          });
+          
+          return this.parseNanopubContent(content, nanopubUri);
+        }
+        
+        return null;
+      } catch (error) {
+        Services.console.logStringMessage(`Error: ${error.message}`);
+        return null;
+      }
+    },
+
+    parseNanopubContent: function(content, uri) {
+      let details = {
+        title: null,
+        description: null,
+        author: null,
+        authorName: null,
+        orcid: null,
+        assertion: null,
+        fullAssertion: null,
+        type: null,
+        contentItems: [],
+        rawContent: content.substring(0, 1000)
+      };
+      
+      try {
+        Services.console.logStringMessage(`Nanopub: parsing content of length ${content.length}`);
+        
+        let contentUriMatches = content.match(/<http:\/\/purl\.org\/[^\/]+\/([^>]+)>/g);
+        if (contentUriMatches) {
+          Services.console.logStringMessage(`Nanopub: found ${contentUriMatches.length} content URIs`);
+          contentUriMatches.forEach((match, idx) => {
+            let uriParts = match.replace(/[<>]/g, '').split('/');
+            let encodedContent = uriParts[uriParts.length - 1];
+            
+            try {
+              let decodedContent = decodeURIComponent(encodedContent);
+              decodedContent = decodedContent.replace(/\+/g, ' ');
+              
+              Services.console.logStringMessage(`Nanopub: decoded URI ${idx}: "${decodedContent.substring(0, 100)}${decodedContent.length > 100 ? '...' : ''}"`);
+              
+              if (decodedContent.length > 50 && 
+                  /[a-zA-Z]/.test(decodedContent) && 
+                  !decodedContent.match(/^[A-Z0-9\-_\.]+$/)) {
+                
+                let namespace = uriParts[3];
+                let contentType = this.getContentTypeFromNamespace(namespace);
+                
+                details.contentItems.push({
+                  type: contentType,
+                  content: decodedContent,
+                  subject: '',
+                  predicate: 'uri:encoded'
+                });
+              }
+            } catch (decodeError) {
+              Services.console.logStringMessage(`Nanopub: failed to decode URI: ${decodeError.message}`);
+            }
+          });
+        }
+        
+        let imagenetLines = content.split('\n').filter(line => 
+          line.toLowerCase().includes('imagenet') || 
+          line.includes('3.2-million') ||
+          line.includes('99.7%')
+        );
+        
+        Services.console.logStringMessage(`Nanopub: found ${imagenetLines.length} ImageNet-related lines`);
+        imagenetLines.forEach((line, idx) => {
+          Services.console.logStringMessage(`Nanopub: ImageNet line ${idx}: "${line}"`);
+        });
+        
+        let lines = content.split('\n');
+        let assertionLines = [];
+        let provenanceLines = [];
+        let inAssertion = false;
+        let inProvenance = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+          let line = lines[i].trim();
+          
+          if (line.includes('# assertion') || line.includes('#assertion')) {
+            inAssertion = true;
+            inProvenance = false;
+            Services.console.logStringMessage("Nanopub: entering assertion section");
+            continue;
+          } else if (line.includes('# provenance') || line.includes('#provenance')) {
+            inProvenance = true;
+            inAssertion = false;
+            Services.console.logStringMessage("Nanopub: entering provenance section");
+            continue;
+          } else if (line.includes('# pubinfo') || line.includes('#pubinfo')) {
+            inAssertion = false;
+            inProvenance = false;
+            Services.console.logStringMessage("Nanopub: entering pubinfo section");
+            continue;
+          }
+          
+          if (inAssertion && line && !line.startsWith('#')) {
+            assertionLines.push(line);
+            if (line.toLowerCase().includes('imagenet')) {
+              Services.console.logStringMessage(`Nanopub: assertion line with ImageNet: "${line}"`);
+            }
+          } else if (inProvenance && line && !line.startsWith('#')) {
+            provenanceLines.push(line);
+          }
+          
+          if ((line.includes('rdfs:label') || line.includes('<http://www.w3.org/2000/01/rdf-schema#label>')) && !details.title) {
+            let match = line.match(/"([^"]+)"/);
+            if (match) {
+              details.title = match[1];
+              Services.console.logStringMessage(`Nanopub: found title: "${details.title}"`);
+            }
+          }
+          
+          if ((line.includes('rdfs:comment') || line.includes('dcterms:description')) && !details.description) {
+            let match = line.match(/"([^"]+)"/);
+            if (match) {
+              details.description = match[1];
+              Services.console.logStringMessage(`Nanopub: found description: "${details.description}"`);
+            }
+          }
+          
+          if (line.includes('dcterms:creator') || line.includes('pav:createdBy')) {
+            let match = line.match(/<([^>]+)>/);
+            if (match) {
+              details.author = match[1];
+              if (match[1].includes('orcid.org')) {
+                details.orcid = match[1].split('/').pop();
+              }
+            }
+          }
+          
+          if (line.includes('foaf:name') || line.includes('schema:name')) {
+            let match = line.match(/"([^"]+)"/);
+            if (match) {
+              details.authorName = match[1];
+            }
+          }
+          
+          if (line.includes('rdf:type') && !line.includes('np:Nanopublication')) {
+            let match = line.match(/<([^>]+)>/);
+            if (match && !details.type) {
+              details.type = this.cleanUriForDisplay(match[1]);
+            }
+          }
+        }
+        
+        Services.console.logStringMessage(`Nanopub: processing ${assertionLines.length} assertion lines`);
+        
+        if (assertionLines.length > 0 && details.contentItems.length === 0) {
+          details.fullAssertion = this.extractFullAssertion(assertionLines);
+          details.assertion = this.simplifyAssertion(assertionLines.join('\n'));
+          let extractedItems = this.extractContentItems(assertionLines);
+          details.contentItems.push(...extractedItems);
+          
+          Services.console.logStringMessage(`Nanopub: extracted ${extractedItems.length} content items from assertion`);
+        }
+        
+        if (details.contentItems.length > 1) {
+          let seen = new Set();
+          details.contentItems = details.contentItems.filter(item => {
+            let key = item.content.toLowerCase().trim();
+            if (seen.has(key)) {
+              Services.console.logStringMessage(`Nanopub: removing duplicate content: ${item.content.substring(0, 50)}...`);
+              return false;
+            }
+            seen.add(key);
+            return true;
+          });
+        }
+        
+        if (provenanceLines.length > 0) {
+          let provenanceInfo = this.extractProvenanceInfo(provenanceLines);
+          if (provenanceInfo.authorName) details.authorName = provenanceInfo.authorName;
+          if (provenanceInfo.orcid) details.orcid = provenanceInfo.orcid;
+        }
+        
+        Services.console.logStringMessage(`Nanopub: final parsed details - title: ${details.title}, authorName: ${details.authorName}, orcid: ${details.orcid}, contentItems: ${details.contentItems.length}`);
+        details.contentItems.forEach((item, idx) => {
+          Services.console.logStringMessage(`Nanopub: content item ${idx}: type="${item.type}", content length=${item.content.length}`);
+        });
+        
+      } catch (error) {
+        Services.console.logStringMessage(`Error parsing nanopub content: ${error.message}`);
+      }
+      
+      return details;
+    },
+
+    getContentTypeFromNamespace: function(namespace) {
+      let namespaceMap = {
+        'aida': 'AIDA Sentence',
+        'cito': 'Citation',
+        'claim': 'Claim',
+        'hypothesis': 'Hypothesis',
+        'statement': 'Statement',
+        'assertion': 'Assertion',
+        'opinion': 'Opinion',
+        'review': 'Review',
+        'summary': 'Summary',
+        'conclusion': 'Conclusion',
+        'observation': 'Observation',
+        'finding': 'Finding',
+        'result': 'Result'
+      };
+      
+      for (let [key, value] of Object.entries(namespaceMap)) {
+        if (namespace && namespace.toLowerCase().includes(key)) {
+          return value;
+        }
+      }
+      
+      if (namespace) {
+        return namespace.charAt(0).toUpperCase() + namespace.slice(1).replace(/[-_]/g, ' ');
+      }
+      
+      return 'Content';
+    },
+
+    extractProvenanceInfo: function(provenanceLines) {
+      let info = { authorName: null, orcid: null, affiliation: null };
+      
+      for (let line of provenanceLines) {
+        if (line.includes('foaf:name') || line.includes('schema:name')) {
+          let match = line.match(/"([^"]+)"/);
+          if (match) {
+            info.authorName = match[1];
+          }
+        }
+        
+        if (line.includes('orcid.org')) {
+          let match = line.match(/orcid\.org\/([0-9\-]+)/);
+          if (match) {
+            info.orcid = match[1];
+          }
+        }
+        
+        if (line.includes('schema:affiliation') || line.includes('foaf:Organization')) {
+          let match = line.match(/"([^"]+)"/);
+          if (match) {
+            info.affiliation = match[1];
+          }
+        }
+      }
+      
+      return info;
+    },
+
+    extractFullAssertion: function(assertionLines) {
+      let fullContent = [];
+      
+      for (let line of assertionLines) {
+        line = line.trim();
+        if (!line || line.startsWith('#') || line.startsWith('@')) continue;
+        
+        let quotedMatch = line.match(/"([^"]+)"/);
+        if (quotedMatch && quotedMatch[1].length > 10) {
+          fullContent.push(quotedMatch[1]);
+        }
+      }
+      
+      return fullContent.length > 0 ? fullContent.join('\n\n') : null;
+    },
+
+    extractContentItems: function(assertionLines) {
+      let contentItems = [];
+      
+      for (let line of assertionLines) {
+        let matches = line.match(/"([^"]+)"/g);
+        if (matches) {
+          matches.forEach(match => {
+            let content = match.replace(/"/g, '');
+            if (content.length > 20) {
+              contentItems.push({
+                type: 'Content',
+                content: content,
+                subject: '',
+                predicate: ''
+              });
+            }
+          });
+        }
+      }
+      
+      return contentItems;
+    },
+
+    cleanPredicateForDisplay: function(predicate) {
+      let clean = this.cleanUriForDisplay(predicate);
+      
+      let predicateMap = {
+        'label': 'Title',
+        'comment': 'Description', 
+        'description': 'Description',
+        'title': 'Title',
+        'name': 'Name',
+        'value': 'Content',
+        'sentence': 'Sentence',
+        'statement': 'Statement',
+        'claim': 'Claim',
+        'hypothesis': 'Hypothesis',
+        'conclusion': 'Conclusion',
+        'summary': 'Summary',
+        'abstract': 'Abstract'
+      };
+      
+      for (let [key, value] of Object.entries(predicateMap)) {
+        if (clean.toLowerCase().includes(key)) {
+          return value;
+        }
+      }
+      
+      return clean.charAt(0).toUpperCase() + clean.slice(1);
+    },
+
+    simplifyAssertion: function(assertionText) {
+      let lines = assertionText.split('\n').filter(line => line.trim());
+      let simplified = [];
+      
+      for (let line of lines) {
+        line = line.trim();
+        if (line && !line.startsWith('#') && !line.startsWith('@')) {
+          let parts = line.split(/\s+/);
+          if (parts.length >= 3) {
+            let subject = this.cleanUriForDisplay(parts[0]);
+            let predicate = this.cleanUriForDisplay(parts[1]);
+            let object = parts.slice(2).join(' ').replace(/[;".]$/, '');
+            
+            if (object.startsWith('"') && object.endsWith('"')) {
+              object = object.slice(1, -1);
+            } else {
+              object = this.cleanUriForDisplay(object);
+            }
+            
+            simplified.push(`${subject} ${predicate} ${object}`);
+          }
+        }
+      }
+      
+      return simplified.slice(0, 3).join('; ');
+    },
+
+    generateNoteFirstLine: function(details) {
+      if (details && details.contentItems && details.contentItems.length > 0) {
+        let longestItem = details.contentItems.reduce((longest, current) => 
+          current.content.length > longest.content.length ? current : longest
+        );
+        
+        let emoji = this.getEmojiForContentType(longestItem.type);
+        return `${emoji} ${longestItem.content}`;
+      }
+      
+      if (details && details.title && !details.title.includes('...')) {
+        return `📄 ${details.title}`;
+      }
+      
+      if (details && details.description) {
+        return `📝 ${details.description}`;
+      }
+      
+      if (details && details.fullAssertion) {
+        let assertion = details.fullAssertion.split('\n')[0];
+        return `⚡ ${assertion}`;
+      }
+      
+      if (details && details.type) {
+        return `🔬 ${details.type}`;
+      }
+      
+      return `🔗 Nanopub`;
+    },
+
+    getEmojiForContentType: function(contentType) {
+      let type = contentType.toLowerCase();
+      
+      if (type.includes('sentence') || type.includes('statement')) return '💡';
+      if (type.includes('title')) return '📄';
+      if (type.includes('description') || type.includes('summary')) return '📝';
+      if (type.includes('claim') || type.includes('hypothesis')) return '🔬';
+      if (type.includes('conclusion')) return '✅';
+      if (type.includes('abstract')) return '📋';
+      
+      return '⚡';
+    },
+
+    generateRichNoteContent: function(nanopub, details) {
+      let content = '<div style="font-family: sans-serif; line-height: 1.4;">';
+      
+      let noteTitle = this.generateNoteFirstLine(details);
+      content += `<div style="margin: 0 0 16px 0; font-size: 16px; font-weight: bold;">${noteTitle}</div>`;
+      
+      if (details?.contentItems && details.contentItems.length > 0) {
+        content += `<h4 style="margin: 12px 0 4px 0;">Content</h4>`;
+        content += `<div style="margin: 0 0 12px 0; padding: 12px; border: 1px solid; border-radius: 4px;">`;
+        
+        let sortedItems = details.contentItems.sort((a, b) => {
+          let priorityTypes = ['title', 'sentence', 'statement', 'description'];
+          let aPriority = priorityTypes.findIndex(type => a.type.toLowerCase().includes(type));
+          let bPriority = priorityTypes.findIndex(type => b.type.toLowerCase().includes(type));
+          
+          if (aPriority !== -1 && bPriority !== -1) {
+            return aPriority - bPriority;
+          } else if (aPriority !== -1) {
+            return -1;
+          } else if (bPriority !== -1) {
+            return 1;
+          }
+          
+          return b.content.length - a.content.length;
+        });
+        
+        for (let item of sortedItems) {
+          content += `<p style="margin: 0 0 8px 0;"><strong>${item.type}:</strong> ${item.content}</p>`;
+        }
+        
+        content += `</div>`;
+      } else if (details?.fullAssertion) {
+        content += `<h4 style="margin: 12px 0 4px 0;">Content</h4>`;
+        content += `<div style="margin: 0 0 12px 0; padding: 12px; border: 1px solid; border-radius: 4px;">`;
+        content += `<p style="margin: 0;">${details.fullAssertion}</p>`;
+        content += `</div>`;
+      } else if (details?.title || details?.description) {
+        content += `<h4 style="margin: 12px 0 4px 0;">Content</h4>`;
+        content += `<div style="margin: 0 0 12px 0; padding: 12px; border: 1px solid; border-radius: 4px;">`;
+        
+        if (details.title) {
+          content += `<p style="margin: 0 0 8px 0;"><strong>Title:</strong> ${details.title}</p>`;
+        }
+        
+        if (details.description) {
+          content += `<p style="margin: 0 0 8px 0;"><strong>Description:</strong> ${details.description}</p>`;
+        }
+        
+        content += `</div>`;
+      }
+      
+      content += `<h4 style="margin: 16px 0 4px 0;">Author & Provenance</h4>`;
+      content += `<div style="padding: 12px; border: 1px solid; border-radius: 6px; margin-bottom: 12px;">`;
+      
+      if (details?.authorName) {
+        content += `<p style="margin: 0 0 6px 0;"><strong>Author:</strong> ${details.authorName}`;
+        if (details.orcid) {
+          content += ` <em>(ORCID: ${details.orcid})</em>`;
+        }
+        content += `</p>`;
+      } else if (details?.orcid) {
+        content += `<p style="margin: 0 0 6px 0;"><strong>Author:</strong> <em>ORCID: ${details.orcid}</em></p>`;
+      }
+      
+      if (details?.type) {
+        content += `<p style="margin: 0 0 6px 0;"><strong>Type:</strong> ${details.type}</p>`;
+      }
+      
+      if (nanopub.date) {
         try {
-          let noteContent = `<div>
-            <h3>Related Nanopublication</h3>
-            <p><strong>URI:</strong> <a href="${nanopub.uri}">${nanopub.uri}</a></p>`;
+          let date = new Date(nanopub.date).toLocaleDateString();
+          content += `<p style="margin: 0 0 6px 0;"><strong>Published:</strong> ${date}</p>`;
+        } catch (e) {
+          // ignore date formatting errors
+        }
+      }
+      
+      content += `<p style="margin: 0;"><strong>Found:</strong> ${new Date().toLocaleDateString()}</p>`;
+      content += `</div>`;
+      
+      content += `<h4 style="margin: 16px 0 4px 0;">Links</h4>`;
+      content += `<div style="padding: 12px; border: 1px solid; border-radius: 6px;">`;
+      content += `<p style="margin: 0;"><strong>Nanopublication URI:</strong><br><a href="${nanopub.uri}" style="word-break: break-all;">${nanopub.uri}</a></p>`;
+      content += `</div>`;
+      
+      content += `</div>`;
+      
+      return content;
+    },
+
+    attachNanopubsToItem: async function(item, nanopubs) {
+      let progressWindow = new Zotero.ProgressWindow();
+      progressWindow.changeHeadline("Processing Nanopublications");
+      progressWindow.addDescription("Fetching detailed information...");
+      progressWindow.show();
+      
+      for (let i = 0; i < nanopubs.length; i++) {
+        let nanopub = nanopubs[i];
+        
+        try {
+          progressWindow.addDescription(`Processing ${i + 1} of ${nanopubs.length}...`);
           
-          if (nanopub.assertion) {
-            noteContent += `<p><strong>Assertion:</strong> <a href="${nanopub.assertion}">${nanopub.assertion}</a></p>`;
-          }
+          let details = await this.fetchNanopubDetails(nanopub.uri);
           
-          if (nanopub.provenance) {
-            noteContent += `<p><strong>Provenance:</strong> <a href="${nanopub.provenance}">${nanopub.provenance}</a></p>`;
-          }
-          
-          if (nanopub.subject && nanopub.predicate && nanopub.object) {
-            noteContent += `<p><strong>Statement:</strong> ${nanopub.subject} ${nanopub.predicate} ${nanopub.object}</p>`;
-          }
-          
-          if (nanopub.date) {
-            noteContent += `<p><strong>Date:</strong> ${nanopub.date}</p>`;
-          }
-          
-          if (nanopub.pubkey) {
-            noteContent += `<p><strong>Publisher Key:</strong> ${nanopub.pubkey}</p>`;
-          }
-          
-          noteContent += `<p><strong>Found:</strong> ${new Date().toLocaleString()}</p>
-          </div>`;
+          let noteContent = this.generateRichNoteContent(nanopub, details);
           
           let note = new Zotero.Item('note');
           note.setNote(noteContent);
           note.parentItemID = item.id;
           
-          note.addTag('nanopub:found');
+          note.addTag('nanopub:related');
           note.addTag('nanopublication');
+          
+          if (details?.type) {
+            note.addTag(`type:${details.type.toLowerCase()}`);
+          }
+          
+          if (details?.authorName) {
+            note.addTag(`author:${details.authorName.toLowerCase()}`);
+          }
           
           await note.saveTx();
           
+          Services.console.logStringMessage(`Nanopub: created note for ${nanopub.uri}`);
+          
         } catch (error) {
-          Services.console.logStringMessage('Error attaching nanopub: ' + error.message);
+          Services.console.logStringMessage(`Error processing nanopub ${i + 1}: ${error.message}`);
+          
+          let noteContent = `<h3>Related Nanopublication (${i + 1})</h3>`;
+          noteContent += `<p><strong>URI:</strong> <a href="${nanopub.uri}">${nanopub.uri}</a></p>`;
+          noteContent += `<p><strong>Found:</strong> ${new Date().toLocaleString()}</p>`;
+          
+          let note = new Zotero.Item('note');
+          note.setNote(noteContent);
+          note.parentItemID = item.id;
+          note.addTag('nanopub:related');
+          note.addTag('nanopublication');
+          await note.saveTx();
         }
       }
+      
+      progressWindow.close();
     },
 
     shutdown: function() {
