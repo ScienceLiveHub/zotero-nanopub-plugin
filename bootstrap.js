@@ -802,6 +802,365 @@ function startup(data, reason) {
       return details;
     },
 
+    extractQuotedContent: function(content) {
+        let quotedTexts = [];
+        
+        try {
+            // Method 1: Extract content from quoted strings in RDF
+            let quotedStrings = content.match(/"([^"\\]*(\\.[^"\\]*)*)"/g);
+            if (quotedStrings) {
+                for (let quote of quotedStrings) {
+                    let cleanQuote = quote.slice(1, -1); // Remove surrounding quotes
+                    // Decode any escaped characters
+                    cleanQuote = cleanQuote.replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                    
+                    // Filter out very short quotes (likely not content) and technical strings
+                    if (cleanQuote.length > 50 && 
+                        !cleanQuote.match(/^https?:\/\//) && 
+                        !cleanQuote.match(/^[A-Z0-9\-_\.]+$/) &&
+                        !cleanQuote.includes('<?xml') &&
+                        !cleanQuote.includes('xmlns:')) {
+                        quotedTexts.push(cleanQuote);
+                    }
+                }
+            }
+            
+            // Method 2: Extract from encoded URIs (common in nanopublications)
+            let encodedMatches = content.match(/<http:\/\/purl\.org\/[^\/]+\/([^>]+)>/g);
+            if (encodedMatches) {
+                for (let match of encodedMatches) {
+                    try {
+                        let encoded = match.replace(/[<>]/g, '').split('/').pop();
+                        let decoded = decodeURIComponent(encoded);
+                        decoded = decoded.replace(/\+/g, ' ');
+                        
+                        // Check if this looks like meaningful content
+                        if (decoded.length > 50 && 
+                            /[a-zA-Z]/.test(decoded) && 
+                            !decoded.match(/^[A-Z0-9\-_\.]+$/) &&
+                            decoded.includes(' ')) {
+                            quotedTexts.push(decoded);
+                        }
+                    } catch (e) {
+                        // Skip malformed encoded content
+                    }
+                }
+            }
+            
+            // Method 3: Look for text in assertion literals
+            let assertionLines = this.extractAssertionLines(content);
+            for (let line of assertionLines) {
+                // Look for literals that might contain the main content
+                let literalMatch = line.match(/"""([^"]*)"""/g) || line.match(/"([^"]{50,})"/g);
+                if (literalMatch) {
+                    for (let literal of literalMatch) {
+                        let cleaned = literal.replace(/^"""?|"""?$/g, '');
+                        if (cleaned.length > 50 && cleaned.includes(' ')) {
+                            quotedTexts.push(cleaned);
+                        }
+                    }
+                }
+            }
+            
+            Services.console.logStringMessage(`Nanopub: Found ${quotedTexts.length} potential quoted texts`);
+            
+        } catch (error) {
+            Services.console.logStringMessage(`Nanopub: Error extracting quoted content: ${error.message}`);
+        }
+        
+        return quotedTexts;
+    },
+
+    extractAssertionLines: function(content) {
+        let lines = content.split('\n');
+        let assertionLines = [];
+        let inAssertion = false;
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            if (line.includes('# assertion') || line.includes('#assertion')) {
+                inAssertion = true;
+                continue;
+            } else if (line.includes('# provenance') || line.includes('#provenance') || 
+                       line.includes('# pubinfo') || line.includes('#pubinfo')) {
+                inAssertion = false;
+                continue;
+            }
+            
+            if (inAssertion && line && !line.startsWith('#')) {
+                assertionLines.push(line);
+            }
+        }
+        
+        return assertionLines;
+    },
+parseQuoteBasedNanopub: function(content, nanopubUri) {
+    let details = {
+        quotes: [],
+        mainQuote: null,
+        author: null,
+        authorName: null,
+        orcid: null,
+        date: null,
+        type: 'Quote-based Nanopublication'
+    };
+    
+    try {
+        // Extract all quoted content
+        details.quotes = this.extractQuotedContent(content);
+        
+        // Find the main quote (usually the longest meaningful one)
+        if (details.quotes.length > 0) {
+            // Sort by length and pick the longest substantive quote
+            let substantiveQuotes = details.quotes.filter(q => 
+                q.length > 100 && 
+                q.split(' ').length > 10 && 
+                !q.includes('http://') &&
+                !q.includes('xmlns')
+            );
+            
+            if (substantiveQuotes.length > 0) {
+                details.mainQuote = substantiveQuotes.sort((a, b) => b.length - a.length)[0];
+            } else if (details.quotes.length > 0) {
+                details.mainQuote = details.quotes.sort((a, b) => b.length - a.length)[0];
+            }
+        }
+        
+        // Extract provenance information (author and ORCID) - Enhanced extraction
+        let provenanceLines = [];
+        let lines = content.split('\n');
+        let inProvenance = false;
+        
+        Services.console.logStringMessage("Nanopub: Starting provenance extraction");
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            if (line.includes('# provenance') || line.includes('#provenance')) {
+                inProvenance = true;
+                Services.console.logStringMessage("Nanopub: Entering provenance section");
+                continue;
+            } else if (line.includes('# pubinfo') || line.includes('#pubinfo') || 
+                       line.includes('# assertion') || line.includes('#assertion')) {
+                if (inProvenance) {
+                    Services.console.logStringMessage("Nanopub: Exiting provenance section");
+                }
+                inProvenance = false;
+                continue;
+            }
+            
+            if (inProvenance && line && !line.startsWith('#')) {
+                provenanceLines.push(line);
+                Services.console.logStringMessage(`Nanopub: Added provenance line: ${line}`);
+            }
+        }
+        
+        Services.console.logStringMessage(`Nanopub: Found ${provenanceLines.length} provenance lines`);
+        
+        // Extract author information from provenance
+        if (provenanceLines.length > 0) {
+            let provenanceInfo = this.extractProvenanceInfo(provenanceLines);
+            details.authorName = provenanceInfo.authorName;
+            details.orcid = provenanceInfo.orcid;
+        }
+        
+        // Fallback: scan the entire content for ORCID patterns if we still don't have one
+        if (!details.orcid) {
+            let orcidMatches = content.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b/g);
+            if (orcidMatches && orcidMatches.length > 0) {
+                details.orcid = orcidMatches[0];
+                Services.console.logStringMessage(`Nanopub: Found ORCID in full content: ${details.orcid}`);
+            }
+        }
+        
+        // Fallback: enhanced author name extraction from entire content if still not found
+        if (!details.authorName) {
+            Services.console.logStringMessage("Nanopub: Trying to find author name in entire content");
+            
+            // Look for any quoted names in the entire content
+            let allQuoted = content.match(/"([^"]+)"/g);
+            if (allQuoted) {
+                for (let quote of allQuoted) {
+                    let potentialName = quote.slice(1, -1);
+                    if (potentialName.includes(' ') && 
+                        potentialName.split(' ').length >= 2 &&
+                        potentialName.split(' ').length <= 4 &&
+                        !potentialName.includes('http://') &&
+                        !potentialName.includes('xmlns') &&
+                        potentialName.length > 5 &&
+                        potentialName.length < 50) {
+                        details.authorName = potentialName;
+                        Services.console.logStringMessage(`Nanopub: Found author name in content: ${details.authorName}`);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Look for date information
+        let dateMatch = content.match(/(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) {
+            details.date = dateMatch[1];
+        }
+        
+        Services.console.logStringMessage(`Nanopub: Final parsing result - Quote: ${details.mainQuote ? details.mainQuote.substring(0, 50) + '...' : 'none'}`);
+        Services.console.logStringMessage(`Nanopub: Final parsing result - Author: ${details.authorName || 'unknown'}, ORCID: ${details.orcid || 'none'}`);
+        
+    } catch (error) {
+        Services.console.logStringMessage(`Nanopub: Error parsing quote-based nanopub: ${error.message}`);
+    }
+    
+    return details;
+},
+generateQuoteBasedNote: function(nanopub, details) {
+    // Use a simple, universal approach:
+    // - No background colors (transparent/inherit)
+    // - Use borders and text formatting for visual separation
+    // - Rely on high-contrast colors that work in both modes
+    
+    let content = '<div style="font-family: sans-serif; line-height: 1.4; max-width: 800px;">';
+    
+    // Header - no background, just border and text
+    content += '<div style="border: 3px solid #007bff; border-radius: 8px; padding: 16px; margin-bottom: 16px;">';
+    
+    let noteTitle = "Nanopublication";
+    if (details?.mainQuote) {
+        let words = details.mainQuote.split(' ').slice(0, 6).join(' ');
+        if (words.length > 0) {
+            noteTitle = words + (details.mainQuote.split(' ').length > 6 ? '...' : '');
+        }
+    }
+    
+    content += `<h3 style="margin: 0 0 8px 0; color: #007bff;">📄 ${noteTitle}</h3>`;
+    content += `<p style="margin: 0; font-style: italic; opacity: 0.8;">Nanopublication content</p>`;
+    content += '</div>';
+
+    // Main Quote Content - yellow border, no background
+    if (details?.mainQuote) {
+        content += '<div style="border: 3px solid #ffc107; border-radius: 8px; padding: 20px; margin-bottom: 16px;">';
+        content += '<h4 style="margin: 0 0 12px 0; color: #ffc107; font-weight: bold;">📝 Content</h4>';
+        content += '<blockquote style="margin: 0; padding: 16px; border-left: 4px solid #ffc107; border-radius: 4px; font-size: 16px; line-height: 1.6; font-style: italic; border: 1px solid #ffc107;">';
+        content += `${details.mainQuote}`;
+        content += '</blockquote>';
+        content += '</div>';
+    }
+
+    // Provenance - green border, no background
+    content += '<div style="border: 3px solid #28a745; border-radius: 8px; padding: 16px; margin-bottom: 16px;">';
+    content += '<h4 style="margin: 0 0 12px 0; color: #28a745; font-weight: bold;">ℹ️ Provenance & Metadata</h4>';
+    
+    if (details?.authorName || details?.orcid) {
+        content += '<div style="border: 2px solid #28a745; border-radius: 6px; padding: 12px; margin-bottom: 12px;">';
+        content += '<h5 style="margin: 0 0 6px 0; font-size: 14px; color: #28a745; font-weight: bold;">Author Information</h5>';
+        
+        if (details?.authorName) {
+            content += `<p style="margin: 0 0 4px 0; font-weight: 500;"><strong>Name:</strong> ${details.authorName}</p>`;
+        }
+        
+        if (details?.orcid) {
+            content += `<p style="margin: 0; font-weight: 500;"><strong>ORCID:</strong> <a href="https://orcid.org/${details.orcid}" target="_blank" style="color: #007bff; text-decoration: underline; font-weight: bold;">${details.orcid}</a></p>`;
+        }
+        content += '</div>';
+    }
+    
+    if (details?.date) {
+        try {
+            let date = new Date(details.date).toLocaleDateString();
+            content += `<p style="margin: 0 0 6px 0; font-weight: 500;"><strong>Published:</strong> ${date}</p>`;
+        } catch (e) {
+            content += `<p style="margin: 0 0 6px 0; font-weight: 500;"><strong>Published:</strong> ${details.date}</p>`;
+        }
+    }
+    
+    content += `<p style="margin: 0; font-weight: 500;"><strong>Added to Zotero:</strong> ${new Date().toLocaleDateString()}</p>`;
+    content += '</div>';
+
+    // Links - purple border, no background
+    content += '<div style="border: 3px solid #6f42c1; border-radius: 8px; padding: 16px;">';
+    content += '<h4 style="margin: 0 0 12px 0; color: #6f42c1; font-weight: bold;">🔗 Links</h4>';
+    
+    content += `<p style="margin: 0 0 8px 0; font-weight: 500;"><strong>Nanopublication:</strong></p>`;
+    
+    // Direct link to the nanopublication
+    content += `<p style="margin: 0 0 12px 0;"><a href="${nanopub.uri}" target="_blank" style="word-break: break-all; font-family: monospace; font-size: 12px; color: #007bff; text-decoration: underline; font-weight: bold; display: block;">${nanopub.uri}</a></p>`;
+    
+    // Explore link
+    let exploreUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(nanopub.uri)}`;
+    content += `<p style="margin: 0;"><a href="${exploreUrl}" target="_blank" style="color: #007bff; text-decoration: underline; font-weight: bold;">🔍 Explore this nanopublication</a></p>`;
+    
+    content += '</div>';
+
+    content += '</div>';
+    
+    return content;
+},
+    fetchNanopubDetailsForQuotes: async function(nanopubUri) {
+        try {
+            Services.console.logStringMessage(`Nanopub: Fetching quotes from ${nanopubUri}`);
+            
+            let response = await fetch(nanopubUri + '.trig', {
+                headers: { 'Accept': 'application/trig' }
+            });
+            
+            if (response.ok) {
+                let content = await response.text();
+                Services.console.logStringMessage(`Nanopub: Got ${content.length} characters for quote extraction`);
+                
+                // Parse for quoted content
+                let details = this.parseQuoteBasedNanopub(content, nanopubUri);
+                
+                return details;
+            }
+            
+            return null;
+        } catch (error) {
+            Services.console.logStringMessage(`Nanopub: Quote fetch error: ${error.message}`);
+            return null;
+        }
+    },
+
+attachNanopubWithQuoteContent: async function(item, nanopub) {
+    try {
+        Services.console.logStringMessage("Nanopub: Attaching with quote content focus");
+        
+        // Fetch quote-focused details
+        let details = await this.fetchNanopubDetailsForQuotes(nanopub.uri);
+        
+        // Generate quote-focused note content
+        let noteContent = this.generateQuoteBasedNote(nanopub, details);
+        
+        let note = new Zotero.Item('note');
+        note.setNote(noteContent);
+        note.parentItemID = item.id;
+        
+        // Add relevant tags
+        note.addTag('nanopub:quote-content');
+        note.addTag('nanopub:related');
+        note.addTag('nanopublication');
+        
+        if (details?.mainQuote) {
+            note.addTag('nanopub:has-quotes');
+        }
+        
+        if (details?.authorName) {
+            note.addTag(`author:${details.authorName.toLowerCase()}`);
+        }
+        
+        if (details?.orcid) {
+            note.addTag(`orcid:${details.orcid}`);
+        }
+        
+        await note.saveTx();
+        
+        Services.console.logStringMessage(`Nanopub: Successfully attached quote-based nanopub: ${nanopub.uri}`);
+        
+    } catch (error) {
+        Services.console.logStringMessage("Nanopub: Error attaching quote-based nanopub: " + error.message);
+        throw error;
+    }
+},
+
     getContentTypeFromNamespace: function(namespace) {
       // First check if we have this namespace in our known templates
       for (let template of this.templates) {
@@ -817,56 +1176,99 @@ function startup(data, reason) {
       
       return 'Content';
     },
-
-    extractProvenanceInfo: function(provenanceLines) {
-      let info = { authorName: null, orcid: null, affiliation: null };
-      
-      for (let line of provenanceLines) {
-        if (line.includes('foaf:name') || line.includes('schema:name')) {
-          let match = line.match(/"([^"]+)"/);
-          if (match) {
-            info.authorName = match[1];
-          }
+extractProvenanceInfo: function(provenanceLines) {
+    let info = {
+        authorName: null,
+        orcid: null
+    };
+    
+    try {
+        Services.console.logStringMessage(`Nanopub: Processing ${provenanceLines.length} provenance lines`);
+        
+        for (let line of provenanceLines) {
+            Services.console.logStringMessage(`Nanopub: Checking line: ${line}`);
+            
+            // Look for ORCID patterns first
+            let orcidMatch = line.match(/\b\d{4}-\d{4}-\d{4}-\d{3}[0-9X]\b/);
+            if (orcidMatch && !info.orcid) {
+                info.orcid = orcidMatch[0];
+                Services.console.logStringMessage(`Nanopub: Found ORCID: ${info.orcid}`);
+            }
+            
+            // Enhanced author name detection
+            // Method 1: Look for quoted names
+            let quotedMatches = line.match(/"([^"]+)"/g);
+            if (quotedMatches && !info.authorName) {
+                for (let match of quotedMatches) {
+                    let potentialName = match.slice(1, -1); // Remove quotes
+                    Services.console.logStringMessage(`Nanopub: Checking quoted text: ${potentialName}`);
+                    
+                    // Check if it looks like a person's name
+                    if (potentialName.length > 3 && 
+                        potentialName.includes(' ') && 
+                        !potentialName.includes('http://') && 
+                        !potentialName.includes('https://') &&
+                        !potentialName.includes('xmlns') && 
+                        !potentialName.includes('://') &&
+                        !potentialName.match(/^[A-Z0-9\-_\.]+$/) &&
+                        potentialName.split(' ').length >= 2 &&
+                        potentialName.split(' ').length <= 5) {
+                        info.authorName = potentialName;
+                        Services.console.logStringMessage(`Nanopub: Found author name: ${info.authorName}`);
+                        break;
+                    }
+                }
+            }
+            
+            // Method 2: Look for foaf:name or schema:name patterns
+            if ((line.includes('foaf:name') || line.includes('schema:name')) && !info.authorName) {
+                let nameMatch = line.match(/(?:foaf:name|schema:name)\s+"([^"]+)"/);
+                if (nameMatch) {
+                    info.authorName = nameMatch[1];
+                    Services.console.logStringMessage(`Nanopub: Found foaf/schema name: ${info.authorName}`);
+                }
+            }
+            
+            // Method 3: Look for rdfs:label that might contain names
+            if (line.includes('rdfs:label') && !info.authorName) {
+                let labelMatch = line.match(/rdfs:label\s+"([^"]+)"/);
+                if (labelMatch) {
+                    let label = labelMatch[1];
+                    // Check if the label looks like a person's name
+                    if (label.includes(' ') && 
+                        label.split(' ').length >= 2 && 
+                        label.split(' ').length <= 4 &&
+                        !label.includes('http://')) {
+                        info.authorName = label;
+                        Services.console.logStringMessage(`Nanopub: Found label name: ${info.authorName}`);
+                    }
+                }
+            }
+            
+            // Method 4: Look for creator patterns with names
+            if (line.includes('prov:wasAttributedTo') && !info.authorName) {
+                // First check if there's a quoted name near the attribution
+                let attributionMatch = line.match(/prov:wasAttributedTo[^"]*"([^"]+)"/);
+                if (attributionMatch) {
+                    let potentialName = attributionMatch[1];
+                    if (potentialName.includes(' ') && 
+                        !potentialName.includes('http://') &&
+                        potentialName.split(' ').length >= 2) {
+                        info.authorName = potentialName;
+                        Services.console.logStringMessage(`Nanopub: Found attribution name: ${info.authorName}`);
+                    }
+                }
+            }
         }
         
-        // More comprehensive ORCID extraction
-        if (line.includes('orcid.org')) {
-          let match = line.match(/orcid\.org\/([0-9\-X]+)/i);
-          if (match) {
-            info.orcid = match[1];
-            Services.console.logStringMessage(`Nanopub: extracted ORCID from provenance: ${info.orcid}`);
-          }
-        }
+        Services.console.logStringMessage(`Nanopub: Final extraction result - Name: ${info.authorName}, ORCID: ${info.orcid}`);
         
-        // Look for standalone ORCID patterns (like 0000-0002-1784-2920)
-        if (!info.orcid) {
-          let orcidPattern = line.match(/\b(\d{4}-\d{4}-\d{4}-\d{3}[0-9X])\b/);
-          if (orcidPattern) {
-            info.orcid = orcidPattern[1];
-            Services.console.logStringMessage(`Nanopub: extracted ORCID pattern from provenance: ${info.orcid}`);
-          }
-        }
-        
-        // Also check for ORCID in creator fields
-        if ((line.includes('dcterms:creator') || line.includes('pav:createdBy')) && line.includes('orcid.org')) {
-          let match = line.match(/orcid\.org\/([0-9\-X]+)/i);
-          if (match) {
-            info.orcid = match[1];
-            Services.console.logStringMessage(`Nanopub: extracted ORCID from creator field: ${info.orcid}`);
-          }
-        }
-        
-        if (line.includes('schema:affiliation') || line.includes('foaf:Organization')) {
-          let match = line.match(/"([^"]+)"/);
-          if (match) {
-            info.affiliation = match[1];
-          }
-        }
-      }
-      
-      return info;
-    },
-
+    } catch (error) {
+        Services.console.logStringMessage(`Nanopub: Error extracting provenance info: ${error.message}`);
+    }
+    
+    return info;
+},
     extractFullAssertion: function(assertionLines) {
       let fullContent = [];
       
@@ -1093,63 +1495,32 @@ function startup(data, reason) {
     },
 
     attachNanopubsToItem: async function(item, nanopubs) {
-      let progressWindow = new Zotero.ProgressWindow();
-      progressWindow.changeHeadline("Processing Nanopublications");
-      progressWindow.addDescription("Fetching detailed information...");
-      progressWindow.show();
-      
-      for (let i = 0; i < nanopubs.length; i++) {
-        let nanopub = nanopubs[i];
+        let progressWindow = new Zotero.ProgressWindow();
+        progressWindow.changeHeadline("Processing Nanopublications");
+        progressWindow.addDescription("Fetching detailed information...");
+        progressWindow.show();
         
-        try {
-          progressWindow.addDescription(`Processing ${i + 1} of ${nanopubs.length}...`);
-          
-          let details = await this.fetchNanopubDetails(nanopub.uri);
-          
-          let noteContent = this.generateRichNoteContent(nanopub, details);
-          
-          let note = new Zotero.Item('note');
-          note.setNote(noteContent);
-          note.parentItemID = item.id;
-          
-          note.addTag('nanopub:related');
-          note.addTag('nanopublication');
-          
-          if (details?.type) {
-            note.addTag(`type:${details.type.toLowerCase()}`);
-          }
-          
-          if (details?.authorName) {
-            note.addTag(`author:${details.authorName.toLowerCase()}`);
-          }
-          
-          if (details?.orcid) {
-            note.addTag(`orcid:${details.orcid}`);
-          }
-          
-          await note.saveTx();
-          
-          Services.console.logStringMessage(`Nanopub: created note for ${nanopub.uri}`);
-          
-        } catch (error) {
-          Services.console.logStringMessage(`Error processing nanopub ${i + 1}: ${error.message}`);
-          
-          let noteContent = `<h3>Related Nanopublication (${i + 1})</h3>`;
-          noteContent += `<p><strong>URI:</strong> <a href="${nanopub.uri}">${nanopub.uri}</a></p>`;
-          noteContent += `<p><strong>Found:</strong> ${new Date().toLocaleString()}</p>`;
-          
-          let note = new Zotero.Item('note');
-          note.setNote(noteContent);
-          note.parentItemID = item.id;
-          note.addTag('nanopub:related');
-          note.addTag('nanopublication');
-          await note.saveTx();
+        for (let i = 0; i < nanopubs.length; i++) {
+            let nanopub = nanopubs[i];
+            
+            try {
+                progressWindow.addDescription(`Processing ${i + 1} of ${nanopubs.length}...`);
+                
+                // USE THE NEW QUOTE-FOCUSED ATTACHMENT METHOD:
+                await this.attachNanopubWithQuoteContent(item, nanopub);
+                
+            } catch (error) {
+                Services.console.logStringMessage(`Error processing nanopub ${nanopub.uri}: ${error.message}`);
+            }
         }
-      }
-      
-      progressWindow.close();
+        
+        progressWindow.close();
+        
+        // Show completion message
+        let ps = Services.prompt;
+        ps.alert(null, "Nanopublications Added", 
+            `Successfully processed ${nanopubs.length} nanopublication(s) with quote content.`);
     },
-
     shutdown: function() {
       let pane = Zotero.getActiveZoteroPane();
       let createMenuItem = pane && pane.document.getElementById("zotero-nanopub-create-menu");
