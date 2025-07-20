@@ -16,3 +16,10 @@ zip -r ../scienceLive-nanopub-plugin.xpi . -x "*.DS_Store" "*.git*"
 2. Select "Create Nanopublication on Nanodash".
 3. Log in to Nanodash with ORCID, create your nanopublication, and copy the URL.
 4. Paste the URL in the Zotero prompt.
+
+
+## Generate the documentation
+
+```
+pip install mkdocs-material mkdocs-git-revision-date-localized-plugin 'mkdocs-material[imaging]'
+```

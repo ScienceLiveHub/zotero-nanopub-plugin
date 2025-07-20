@@ -1,0 +1,132 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.2)'
+        required: true
+        default: 'v1.0.2'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Get version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Update manifest version
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        # Remove 'v' prefix for manifest
+        VERSION_NUM=${VERSION#v}
+        
+        # Update manifest.json version
+        sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION_NUM\"/" manifest.json
+        
+        echo "Updated manifest.json to version $VERSION_NUM"
+        cat manifest.json
+    
+    - name: Create XPI package
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        XPI_NAME="zotero-nanopub-plugin-${VERSION}.xpi"
+        
+        # Create XPI with only necessary files
+        zip -r "$XPI_NAME" . \
+          -x "*.DS_Store" \
+          -x "*.git*" \
+          -x "docs/*" \
+          -x "node_modules/*" \
+          -x "README.md" \
+          -x "mkdocs.yml" \
+          -x ".github/*" \
+          -x "*.log" \
+          -x "*.tmp"
+        
+        echo "XPI_NAME=$XPI_NAME" >> $GITHUB_ENV
+        
+        # Verify contents
+        echo "XPI Contents:"
+        unzip -l "$XPI_NAME"
+    
+    - name: Create updates.json
+      run: |
+        VERSION="${{ steps.version.outputs.VERSION }}"
+        VERSION_NUM=${VERSION#v}
+        
+        cat > updates.json << EOF
+        {
+          "addons": {
+            "nanopub-plugin@sciencelivehub.com": {
+              "updates": [
+                {
+                  "version": "$VERSION_NUM",
+                  "update_link": "https://github.com/ScienceLiveHub/zotero-nanopub-plugin/releases/latest/download/$XPI_NAME",
+                  "applications": {
+                    "zotero": {
+                      "strict_min_version": "7.0",
+                      "strict_max_version": "7.0.*"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+        EOF
+        
+        echo "Created updates.json:"
+        cat updates.json
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.VERSION }}
+        name: Release ${{ steps.version.outputs.VERSION }}
+        body: |
+          ## Zotero Nanopublication Plugin ${{ steps.version.outputs.VERSION }}
+          
+          ### Installation
+          1. Download the `.xpi` file below
+          2. In Zotero, go to Tools > Add-ons
+          3. Drag the `.xpi` file into the Add-ons window
+          4. Restart Zotero when prompted
+          
+          ### Features
+          - Create nanopublications from Zotero items
+          - PDF text selection support
+          - Multiple nanopublication templates
+          - Search for related nanopublications
+          - Rich note generation
+          
+          ### Changes
+          - See commit history for detailed changes
+          
+          ### Requirements
+          - Zotero 7.0 or later
+          
+          ---
+          **Download the XPI file below to install the plugin.**
+        files: |
+          ${{ env.XPI_NAME }}
+          updates.json
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
