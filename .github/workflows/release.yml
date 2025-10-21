@@ -7,19 +7,26 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.0.2)'
+        description: 'Release version (e.g., v2.0.0)'
         required: true
-        default: 'v1.0.2'
+        default: 'v2.0.0'
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
     
     - name: Get version
       id: version
@@ -29,46 +36,40 @@ jobs:
         else
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
+        # Remove 'v' prefix for version number
+        VERSION_NUM=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref }}" | sed 's/refs\/tags\///' | sed 's/^v//')
+        echo "VERSION_NUM=$VERSION_NUM" >> $GITHUB_OUTPUT
     
-    - name: Update manifest version
+    - name: Update package.json version
+      run: |
+        VERSION_NUM="${{ steps.version.outputs.VERSION_NUM }}"
+        npm version $VERSION_NUM --no-git-tag-version
+        echo "Updated package.json to version $VERSION_NUM"
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build plugin
+      run: npm run build
+    
+    - name: Verify build
+      run: |
+        echo "Build directory contents:"
+        ls -lah build/
+        echo ""
+        echo "XPI contents:"
+        unzip -l build/nanopub.xpi
+    
+    - name: Rename XPI with version
       run: |
         VERSION="${{ steps.version.outputs.VERSION }}"
-        # Remove 'v' prefix for manifest
-        VERSION_NUM=${VERSION#v}
-        
-        # Update manifest.json version
-        sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION_NUM\"/" manifest.json
-        
-        echo "Updated manifest.json to version $VERSION_NUM"
-        cat manifest.json
-    
-    - name: Create XPI package
-      run: |
-        VERSION="${{ steps.version.outputs.VERSION }}"
-        XPI_NAME="zotero-nanopub-plugin-${VERSION}.xpi"
-        
-        # Create XPI with only necessary files
-        zip -r "$XPI_NAME" . \
-          -x "*.DS_Store" \
-          -x "*.git*" \
-          -x "docs/*" \
-          -x "node_modules/*" \
-          -x "README.md" \
-          -x "mkdocs.yml" \
-          -x ".github/*" \
-          -x "*.log" \
-          -x "*.tmp"
-        
-        echo "XPI_NAME=$XPI_NAME" >> $GITHUB_ENV
-        
-        # Verify contents
-        echo "XPI Contents:"
-        unzip -l "$XPI_NAME"
+        cp build/nanopub.xpi "nanopub-plugin-${VERSION}.xpi"
+        echo "XPI_NAME=nanopub-plugin-${VERSION}.xpi" >> $GITHUB_ENV
     
     - name: Create updates.json
       run: |
+        VERSION_NUM="${{ steps.version.outputs.VERSION_NUM }}"
         VERSION="${{ steps.version.outputs.VERSION }}"
-        VERSION_NUM=${VERSION#v}
         
         cat > updates.json << EOF
         {
@@ -77,11 +78,11 @@ jobs:
               "updates": [
                 {
                   "version": "$VERSION_NUM",
-                  "update_link": "https://github.com/ScienceLiveHub/zotero-nanopub-plugin/releases/latest/download/$XPI_NAME",
+                  "update_link": "https://github.com/ScienceLiveHub/zotero-nanopub-plugin/releases/download/${VERSION}/nanopub-plugin-${VERSION}.xpi",
                   "applications": {
                     "zotero": {
-                      "strict_min_version": "7.0",
-                      "strict_max_version": "7.0.*"
+                      "strict_min_version": "6.999",
+                      "strict_max_version": "8.0.*"
                     }
                   }
                 }
@@ -99,34 +100,46 @@ jobs:
       with:
         tag_name: ${{ steps.version.outputs.VERSION }}
         name: Release ${{ steps.version.outputs.VERSION }}
+        draft: false
+        prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') }}
+        generate_release_notes: true
         body: |
-          ## Zotero Nanopublication Plugin ${{ steps.version.outputs.VERSION }}
+          ## Zotero Nanopub Plugin ${{ steps.version.outputs.VERSION }}
           
-          ### Installation
-          1. Download the `.xpi` file below
-          2. In Zotero, go to Tools > Add-ons
-          3. Drag the `.xpi` file into the Add-ons window
-          4. Restart Zotero when prompted
+          ### 📥 Installation
           
-          ### Features
-          - Create nanopublications from Zotero items
-          - PDF text selection support
-          - Multiple nanopublication templates
-          - Search for related nanopublications
-          - Rich note generation
+          1. Download `${{ env.XPI_NAME }}` below
+          2. In Zotero: **Tools → Add-ons**
+          3. Click gear icon → **Install Add-on From File**
+          4. Select the downloaded XPI
+          5. Restart Zotero
           
-          ### Changes
-          - See commit history for detailed changes
+          ### ✨ Features
           
-          ### Requirements
+          - **Import as New Item** - Create standalone nanopublication items
+          - **Attach to Existing Item** - Attach nanopubs as notes to papers
+          - **nanopub-view Integration** - Beautiful rendering with type-based titles
+          - **Dark Mode Support** - Works seamlessly with Zotero themes
+          - **Smart Tagging** - Automatic type-based organization
+          
+          ### 📋 Requirements
+          
           - Zotero 7.0 or later
           
+          ### 🔗 Menu Items
+          
+          **File Menu:**
+          - Import Nanopublication as New Item...
+          - Import Nanopublication (Attach to Item)...
+          
+          **Right-click Context Menu:**
+          - 📎 Attach Nanopublication...
+          
           ---
+          
           **Download the XPI file below to install the plugin.**
         files: |
           ${{ env.XPI_NAME }}
           updates.json
-        draft: false
-        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
