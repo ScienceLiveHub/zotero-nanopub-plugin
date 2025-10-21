@@ -127,6 +127,8 @@ export class MenuManager {
     }
   }
 
+// src/modules/menu.ts - Add to addContextMenuItems method
+
   /**
    * Add items to context menu when it opens
    */
@@ -154,6 +156,9 @@ export class MenuManager {
       const oldImportItem = doc.getElementById('nanopub-context-import');
       if (oldImportItem) oldImportItem.remove();
 
+      const oldSearchItem = doc.getElementById('nanopub-context-search');
+      if (oldSearchItem) oldSearchItem.remove();
+
       // Add separator
       const separator = doc.createXULElement ? 
         doc.createXULElement('menuseparator') : 
@@ -172,8 +177,20 @@ export class MenuManager {
         self.importNanopubByUrl();
       });
 
+      // Add "Search Related Nanopublications" menu item
+      const searchItem = doc.createXULElement ? 
+        doc.createXULElement('menuitem') : 
+        doc.createElement('menuitem');
+      searchItem.id = 'nanopub-context-search';
+      searchItem.setAttribute('label', '🔍 Search Related Nanopublications');
+      
+      searchItem.addEventListener('command', function() {
+        self.searchRelatedNanopubs();
+      });
+
       popup.appendChild(separator);
       popup.appendChild(importItem);
+      popup.appendChild(searchItem);
       
       log("Context menu items added");
     } catch (err: any) {
@@ -181,6 +198,106 @@ export class MenuManager {
     }
   }
 
+  /**
+   * Search for and attach related nanopublications
+   */
+  private async searchRelatedNanopubs() {
+    try {
+      log("Search related nanopubs triggered");
+
+      // Get selected item
+      const pane = Zotero.getActiveZoteroPane();
+      if (!pane) {
+        throw new Error("No active Zotero pane");
+      }
+
+      const items = pane.getSelectedItems();
+      
+      if (items.length === 0 || !items[0].isRegularItem()) {
+        Services.prompt.alert(
+          null,
+          'No Item Selected',
+          'Please select an item in your library first.'
+        );
+        return;
+      }
+
+      const targetItem = items[0];
+      const itemTitle = targetItem.getField('title');
+      
+      log("Searching for nanopubs related to: " + itemTitle);
+
+      // Show progress
+      const progressWin = new Zotero.ProgressWindow();
+      progressWin.changeHeadline('Searching for Nanopublications');
+      progressWin.addLines(['Searching for related nanopublications...']);
+      progressWin.show();
+
+      // Search using the search module
+      const searchModule = Zotero.Nanopub.searchModule;
+      const nanopubUris = await searchModule.searchForItem(targetItem);
+
+      progressWin.close();
+
+      if (nanopubUris.length === 0) {
+        Services.prompt.alert(
+          null,
+          'No Results',
+          'No nanopublications found related to this item.'
+        );
+        return;
+      }
+
+      // Ask user if they want to import all or select
+      const prompts = Services.prompt;
+      const result = prompts.confirm(
+        null,
+        'Nanopublications Found',
+        `Found ${nanopubUris.length} related nanopublication(s).\n\nDo you want to attach all of them to this item?`
+      );
+
+      if (!result) {
+        log("User cancelled import");
+        return;
+      }
+
+      // Import all found nanopubs
+      progressWin.changeHeadline('Importing Nanopublications');
+      progressWin.addLines([`Importing ${nanopubUris.length} nanopublications...`]);
+      progressWin.show();
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const uri of nanopubUris) {
+        try {
+          await Zotero.Nanopub.displayModule.displayFromUri(targetItem, uri);
+          successCount++;
+          progressWin.addLines([`✓ Imported ${successCount}/${nanopubUris.length}`]);
+        } catch (err: any) {
+          error("Failed to import nanopub: " + uri, err);
+          failCount++;
+        }
+      }
+
+      progressWin.close();
+
+      Services.prompt.alert(
+        null,
+        'Import Complete',
+        `Successfully imported ${successCount} nanopublication(s).\n` +
+        (failCount > 0 ? `Failed to import ${failCount} nanopublication(s).` : '')
+      );
+
+    } catch (err: any) {
+      error("Search related nanopubs failed:", err);
+      Services.prompt.alert(
+        null,
+        'Error',
+        'Failed to search for nanopublications: ' + err.message
+      );
+    }
+  }
   /**
    * Import nanopublication as a new standalone item
    */

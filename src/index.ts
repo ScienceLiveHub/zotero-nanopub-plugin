@@ -1,6 +1,7 @@
 // src/index.ts
 import { log, error } from "./utils/logger";
 import { NanopubDisplay } from "./modules/nanopubDisplay";
+import { NanopubSearch } from "./modules/nanopubSearch";
 import { MenuManager } from "./modules/menu";
 
 // Declare global types
@@ -20,6 +21,7 @@ const initPlugin = () => {
   }
 
   let displayModule: NanopubDisplay | null = null;
+  let searchModule: NanopubSearch | null = null;
   let menuManager: MenuManager | null = null;
 
   Zotero.Nanopub.onStartup = async function({
@@ -48,6 +50,11 @@ const initPlugin = () => {
       Zotero.Nanopub.displayModule = displayModule;
       log("Display module initialized successfully");
 
+      // Initialize search module
+      searchModule = new NanopubSearch();
+      Zotero.Nanopub.searchModule = searchModule;
+      log("Search module initialized successfully");
+
       // Initialize menu manager
       menuManager = new MenuManager({ id, version, rootURI });
       await menuManager.registerMenus();
@@ -72,6 +79,7 @@ const initPlugin = () => {
       }
       
       displayModule = null;
+      searchModule = null;
       menuManager = null;
     } catch (err: any) {
       error("Failed to shutdown properly:", err);
