@@ -50,11 +50,45 @@ jobs:
     
     - name: Build nanopub-view dependency
       run: |
-        echo "📦 Building nanopub-view from GitHub..."
+        echo "📦 Building nanopub-view library from GitHub..."
         cd node_modules/@sciencelivehub/nanopub-view
+        
+        # Install dependencies
         npm install
-        npm run build
+        
+        # Create a temporary library-only vite config
+        cat > vite.lib.config.js << 'VITE_EOF'
+        import { defineConfig } from 'vite';
+        import path from 'path';
+        
+        export default defineConfig({
+          build: {
+            lib: {
+              entry: path.resolve(__dirname, 'src/index.js'),
+              name: 'NanopubViewer',
+              formats: ['es', 'umd'],
+              fileName: (format) => {
+                if (format === 'es') return 'nanopub-viewer.esm.js';
+                if (format === 'umd') return 'nanopub-viewer.js';
+              }
+            },
+            rollupOptions: {
+              output: {
+                assetFileNames: (assetInfo) => {
+                  if (assetInfo.name === 'style.css') return 'nanopub-viewer.css';
+                  return assetInfo.name;
+                }
+              }
+            }
+          }
+        });
+        VITE_EOF
+        
+        # Build using the library config
+        npx vite build --config vite.lib.config.js
+        
         cd ../../..
+        
         echo "✅ nanopub-view built successfully"
         ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
     
