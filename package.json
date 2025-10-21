@@ -1,0 +1,35 @@
+{
+  "name": "zotero-plugin-nanopub",
+  "version": "2.0.0",
+  "description": "Create nanopublications from Zotero items and link them to your bibliography",
+  "author": "ScienceLiveHub <contact@vitenhub.no>",
+  "license": "MIT",
+  "homepage": "https://github.com/ScienceLiveHub/zotero-nanopub-plugin",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ScienceLiveHub/zotero-nanopub-plugin.git"
+  },
+  "config": {
+    "addonName": "Nanopublication Plugin",
+    "addonID": "nanopub-plugin@sciencelivehub.com",
+    "addonRef": "nanopub",
+    "addonInstance": "Nanopub"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
+    "clean": "rm -rf build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.11",
+    "archiver": "^6.0.1",
+    "esbuild": "^0.19.12",
+    "replace-in-file": "^7.2.0",
+    "typescript": "^5.9.2",
+    "zotero-types": "^2.2.1"
+  },
+  "dependencies": {
+    "@sciencelivehub/nanopub-view": "github:ScienceLiveHub/nanopub-view",
+    "zotero-plugin-toolkit": "^2.3.37"
+  }
+}
