@@ -21,15 +21,28 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm install
+      
+      - name: Build nanopub-view dependency
+        run: |
+          echo "📦 Building nanopub-view from GitHub..."
+          cd node_modules/@sciencelivehub/nanopub-view
+          npm install
+          npm run build
+          cd ../../..
+          echo "✅ nanopub-view built successfully"
+          ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
       
       - name: Build plugin
         run: npm run build
       
       - name: Verify build
         run: |
-          echo "Build completed successfully!"
+          echo "✅ Build completed successfully!"
           ls -lah build/
+          echo ""
+          echo "XPI size:"
+          du -h build/nanopub.xpi
           
       - name: Upload XPI artifact
         uses: actions/upload-artifact@v4

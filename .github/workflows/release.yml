@@ -36,7 +36,6 @@ jobs:
         else
           echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
         fi
-        # Remove 'v' prefix for version number
         VERSION_NUM=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref }}" | sed 's/refs\/tags\///' | sed 's/^v//')
         echo "VERSION_NUM=$VERSION_NUM" >> $GITHUB_OUTPUT
     
@@ -47,7 +46,17 @@ jobs:
         echo "Updated package.json to version $VERSION_NUM"
     
     - name: Install dependencies
-      run: npm ci
+      run: npm install
+    
+    - name: Build nanopub-view dependency
+      run: |
+        echo "📦 Building nanopub-view from GitHub..."
+        cd node_modules/@sciencelivehub/nanopub-view
+        npm install
+        npm run build
+        cd ../../..
+        echo "✅ nanopub-view built successfully"
+        ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
     
     - name: Build plugin
       run: npm run build
