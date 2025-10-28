@@ -147,14 +147,25 @@ async function build() {
   console.log('🎨 Copying CSS files...');
   
   // Copy nanopub-view CSS
-  const nanopubCssSource = path.join(__dirname, '..', 'node_modules', '@sciencelivehub', 'nanopub-view', 'dist', 'nanopub-viewer.css');
-  const nanopubCssDest = path.join(stylesDir, 'nanopub-viewer.css');
+  const nanopubViewCss = path.join(__dirname, '..', 'node_modules', '@sciencelivehub', 'nanopub-view', 'dist', 'nanopub-view.css');
+  const nanopubViewDest = path.join(stylesDir, 'nanopub-view.css');
   
-  if (fs.existsSync(nanopubCssSource)) {
-    fs.copyFileSync(nanopubCssSource, nanopubCssDest);
-    console.log('✅ Copied nanopub-viewer.css');
+  if (fs.existsSync(nanopubViewCss)) {
+    fs.copyFileSync(nanopubViewCss, nanopubViewDest);
+    console.log('✅ Copied nanopub-view.css');
   } else {
     console.warn('⚠️  Warning: nanopub-viewer.css not found');
+  }
+
+  // Copy nanopub-create CSS (NEW)
+  const nanopubCreateCss = path.join(__dirname, '..', 'node_modules', '@sciencelivehub', 'nanopub-create', 'dist', 'nanopub-creator.css');
+  const nanopubCreateDest = path.join(stylesDir, 'nanopub-creator.css');
+
+  if (fs.existsSync(nanopubCreateCss)) {
+    fs.copyFileSync(nanopubCreateCss, nanopubCreateDest);
+    console.log('✅ Copied nanopub-creator.css');
+  } else {
+    console.warn('⚠️  Warning: nanopub-creator.css not found');
   }
 
   console.log('📝 Creating manifest...');

@@ -6,6 +6,7 @@ echo "🔨 Building dependencies..."
 echo "📦 Building nanopub-view..."
 cd node_modules/@sciencelivehub/nanopub-view
 
+# Install its dependencies
 npm install
 
 # Create temporary library-only vite config
@@ -36,9 +37,27 @@ export default defineConfig({
 });
 VITE_EOF
 
+# Build it
 npx vite build --config vite.lib.config.js
 
 cd ../../..
 
-echo "✅ Dependencies built successfully"
+echo "✅ nanopub-view built"
 ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
+
+# Build nanopub-create
+echo "📦 Building nanopub-create..."
+cd node_modules/@sciencelivehub/nanopub-create
+
+# Install its dependencies
+npm install
+
+# Build it (it already has vite.lib.config.js)
+npx vite build --config vite.lib.config.js
+
+cd ../../..
+
+echo "✅ nanopub-create built"
+ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
+
+echo "✅ All dependencies built successfully"

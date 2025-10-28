@@ -29,6 +29,7 @@
     "zotero-types": "^2.2.1"
   },
   "dependencies": {
+    "@sciencelivehub/nanopub-create": "github:ScienceLiveHub/nanopub-create",
     "@sciencelivehub/nanopub-view": "github:ScienceLiveHub/nanopub-view",
     "zotero-plugin-toolkit": "^2.3.37"
   }
