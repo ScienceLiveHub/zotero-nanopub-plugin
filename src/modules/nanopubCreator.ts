@@ -1,5 +1,6 @@
-// src/modules/nanopubCreator.ts - FINAL WORKING VERSION
-// Based on successful console testing
+// src/modules/nanopubCreator.ts
+// Wrapper around @sciencelivehub/nanopub-create npm package
+// ONLY uses methods that actually exist in the package
 
 import { createZoteroStorage } from "../utils/zoteroStorage";
 
@@ -66,7 +67,7 @@ export class ZoteroNanopubCreator {
 
       await this.creator.ensureWasm();
 
-      console.log('🔐 Signing nanopub...');
+      console.log('🔏 Signing nanopub...');
 
       // Use internal publish() - it signs but doesn't publish (publishServer is null)
       const result = await this.creator.publish(trigContent);
@@ -87,80 +88,80 @@ export class ZoteroNanopubCreator {
   }
 
   /**
-   * Extract the nanopub URI from signed content
-   * The URI is in the PREFIX this: <URI> line
-   */
-  extractUri(signedContent: string): string {
-    const uriMatch = signedContent.match(/PREFIX this: <(https:\/\/w3id\.org\/np\/[^>]+)>/);
-    
-    if (!uriMatch) {
-      throw new Error('Could not extract URI from signed content');
-    }
-
-    return uriMatch[1];
-  }
-
-  /**
-   * Publish signed content using Zotero's HTTP
-   * 
-   * @param signedContent - Signed TriG content
-   * @returns Nanopub URI (extracted from content)
-   */
-  async publishViaZotero(signedContent: string): Promise<string> {
-    try {
-      // Extract URI first (we need this regardless of publish success)
-      const uri = this.extractUri(signedContent);
-      
-      console.log('📤 Publishing to network...');
-      console.log('📍 URI:', uri);
-      
-      // Try to publish
-      const response = await Zotero.HTTP.request(
-        'POST',
-        'https://np.knowledgepixels.com/',
-        {
-          body: signedContent,
-          headers: {
-            'Content-Type': 'application/trig'
-          },
-          responseType: 'text'
-        }
-      );
-
-      console.log('✅ Published! Status:', response.status);
-
-      return uri;
-
-    } catch (e) {
-      // Even if publishing fails, we have the signed nanopub
-      console.warn('⚠️ Publishing error:', e.message);
-      
-      // Try to extract URI anyway
-      try {
-        const uri = this.extractUri(signedContent);
-        console.log('📍 Have URI from signed content:', uri);
-        return uri;
-      } catch (extractError) {
-        throw new Error(`Publishing failed and could not extract URI: ${e.message}`);
-      }
-    }
-  }
-
-  /**
-   * Sign and publish in one step
+   * Sign and publish a nanopub to the network
    * 
    * @param trigContent - Unsigned TriG content
    * @returns Object with URI and signed content
    */
   async signAndPublish(trigContent: string): Promise<{ uri: string; signedContent: string }> {
     try {
-      console.log('🔐 Step 1: Signing...');
+      // First sign it
       const signedContent = await this.sign(trigContent);
+
+      console.log('📤 Publishing to network...');
+
+      // Publish to the nanopub server
+      const publishUrl = 'https://np.knowledgepixels.com/';
       
-      console.log('📤 Step 2: Publishing...');
-      const uri = await this.publishViaZotero(signedContent);
+      const response = await fetch(publishUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/trig',
+        },
+        body: signedContent
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Publishing failed. Status:', response.status);
+        console.error('Response:', errorText);
+        throw new Error(`Publishing failed: ${response.status} ${response.statusText}`);
+      }
+
+      // Extract URI from response
+      const responseText = await response.text();
+      console.log('📨 Publish response:', responseText);
       
-      console.log('✅ Complete!');
+      // Try different patterns to extract the URI
+      let uri = null;
+      
+      // Pattern 1: Standard w3id.org format
+      let uriMatch = responseText.match(/https?:\/\/w3id\.org\/np\/[A-Za-z0-9_-]+/);
+      if (uriMatch) {
+        uri = uriMatch[0];
+      }
+      
+      // Pattern 2: Look for any nanopub identifier
+      if (!uri) {
+        uriMatch = responseText.match(/https?:\/\/[^\/\s]+\/np\/[A-Za-z0-9_-]+/);
+        if (uriMatch) {
+          uri = uriMatch[0];
+        }
+      }
+      
+      // Pattern 3: Check if response is just the URI
+      if (!uri && responseText.trim().startsWith('http')) {
+        uri = responseText.trim();
+      }
+      
+      // Pattern 4: Look in Location header
+      if (!uri) {
+        const location = response.headers.get('Location');
+        if (location) {
+          console.log('📍 Found URI in Location header:', location);
+          uri = location;
+        }
+      }
+      
+      if (!uri) {
+        console.error('❌ Could not extract URI from response');
+        console.error('Response text:', responseText);
+        console.error('Response headers:', Array.from(response.headers.entries()));
+        throw new Error('Could not extract URI from publish response. Server response: ' + responseText.substring(0, 200));
+      }
+
+      console.log('✅ Published successfully!');
+      console.log('🌐 URI:', uri);
       
       return { uri, signedContent };
 
@@ -246,7 +247,7 @@ sub:pubinfo {
       const result = await this.signAndPublish(trigContent);
 
       console.log('✅ Citation nanopub created!');
-      console.log('📍 URI:', result.uri);
+      console.log('📌 URI:', result.uri);
 
       return result;
 
@@ -257,83 +258,14 @@ sub:pubinfo {
   }
 
   /**
-   * Template support - load template and create nanopub
-   */
-  async createFromTemplate(
-    templateUri: string,
-    values: Record<string, string>
-  ): Promise<string> {
-    try {
-      if (!this.hasProfile()) {
-        throw new Error('Please set up your profile first');
-      }
-
-      console.log('📝 Creating from template:', templateUri);
-      
-      await this.creator.loadTemplate(templateUri);
-      this.creator.formData = values;
-      const trigContent = await this.creator.generateNanopub();
-      
-      console.log('✅ Generated from template');
-      
-      return trigContent;
-      
-    } catch (e) {
-      console.error('Failed to create from template:', e);
-      throw e;
-    }
-  }
-
-  /**
-   * Load template info
-   */
-  async loadTemplateInfo(templateUri: string): Promise<{
-    label: string;
-    description: string;
-    placeholders: Array<{ id: string; label: string; required: boolean; type: string }>;
-    types: string[];
-  }> {
-    try {
-      await this.creator.loadTemplate(templateUri);
-      const template = this.creator.template;
-      
-      const placeholders = (template.placeholders || []).map((p: any) => ({
-        id: p.id,
-        label: p.label || p.id,
-        required: p.required !== false,
-        type: p.type || 'unknown'
-      }));
-      
-      return {
-        label: template.label || 'Untitled',
-        description: template.description || '',
-        placeholders: placeholders,
-        types: template.types || []
-      };
-    } catch (e) {
-      console.error('Failed to load template:', e);
-      throw e;
-    }
-  }
-
-  /**
-   * Create and publish from template
-   */
-  async createAndPublishFromTemplate(
-    templateUri: string,
-    values: Record<string, string>
-  ): Promise<{ uri: string; signedContent: string }> {
-    const trigContent = await this.createFromTemplate(templateUri, values);
-    return await this.signAndPublish(trigContent);
-  }
-
-  /**
    * Render form from template (for UI)
+   * This is the ACTUAL method from the npm package
    */
   async renderFromTemplateUri(templateUri: string, container: HTMLElement): Promise<void> {
     if (!this.hasProfile()) {
       throw new Error('Please set up your profile first');
     }
+    // This method EXISTS in the npm package
     await this.creator.renderFromTemplateUri(templateUri, container);
   }
 
