@@ -1,5 +1,8 @@
 // src/modules/menu.ts
 import { log, error } from "../utils/logger";
+import { NanopubCreationDialog } from "./nanopubCreationDialog";
+import { TemplateFormDialog } from "./templateFormDialog";
+
 
 export class MenuManager {
   private addon: any;
@@ -23,6 +26,9 @@ export class MenuManager {
 
       // Register context menu items
       this.registerContextMenu();
+
+      // Register nanopub creation menu items
+      this.registerNanopubCreationMenus();
 
       log("Menu items registered successfully");
     } catch (err: any) {
@@ -127,7 +133,77 @@ export class MenuManager {
     }
   }
 
-// src/modules/menu.ts - Add to addContextMenuItems method
+  /**
+   * Register nanopub creation menu items
+   */
+  private registerNanopubCreationMenus() {
+    try {
+      const win = Zotero.getMainWindow();
+      if (!win) {
+        error("No main window available");
+        return;
+      }
+
+      const doc = win.document;
+      const fileMenu = doc.getElementById('menu_FilePopup');
+      
+      if (!fileMenu) {
+        error("File menu popup not found");
+        return;
+      }
+
+      log("Adding nanopub creation menu items...");
+
+      // Create separator for creation items
+      const creationSeparator = doc.createXULElement ? 
+        doc.createXULElement('menuseparator') : 
+        doc.createElement('menuseparator');
+      creationSeparator.id = 'nanopub-creation-separator';
+
+      // Setup Profile menu item
+      const setupProfileItem = doc.createXULElement ? 
+        doc.createXULElement('menuitem') : 
+        doc.createElement('menuitem');
+      setupProfileItem.id = 'nanopub-setup-profile';
+      setupProfileItem.setAttribute('label', 'Setup Nanopub Profile');
+      
+      setupProfileItem.addEventListener('command', function() {
+        NanopubCreationDialog.showProfileSetupDialog();
+      });
+
+      // Create Citation menu item
+      const createCitationItem = doc.createXULElement ? 
+        doc.createXULElement('menuitem') : 
+        doc.createElement('menuitem');
+      createCitationItem.id = 'nanopub-create-citation';
+      createCitationItem.setAttribute('label', 'Create Citation Nanopub from Item');
+      
+      createCitationItem.addEventListener('command', function() {
+        NanopubCreationDialog.showCreateCitationDialog();
+      });
+
+      // Show Profile menu item
+      const showProfileItem = doc.createXULElement ? 
+        doc.createXULElement('menuitem') : 
+        doc.createElement('menuitem');
+      showProfileItem.id = 'nanopub-show-profile';
+      showProfileItem.setAttribute('label', 'Show Nanopub Profile');
+      
+      showProfileItem.addEventListener('command', function() {
+        NanopubCreationDialog.showProfileInfo();
+      });
+
+      // Add to file menu
+      fileMenu.appendChild(creationSeparator);
+      fileMenu.appendChild(setupProfileItem);
+      fileMenu.appendChild(createCitationItem);
+      fileMenu.appendChild(showProfileItem);
+      
+      log("Nanopub creation menu items added successfully");
+    } catch (err: any) {
+      error("Error adding nanopub creation menu:", err);
+    }
+  }
 
   /**
    * Add items to context menu when it opens
@@ -170,7 +246,7 @@ export class MenuManager {
         doc.createXULElement('menuitem') : 
         doc.createElement('menuitem');
       importItem.id = 'nanopub-context-import';
-      importItem.setAttribute('label', '📎 Attach Nanopublication...');
+      importItem.setAttribute('label', '🔎 Attach Nanopublication...');
       
       const self = this;
       importItem.addEventListener('command', function() {
@@ -298,6 +374,7 @@ export class MenuManager {
       );
     }
   }
+
   /**
    * Import nanopublication as a new standalone item
    */
@@ -430,7 +507,7 @@ export class MenuManager {
 
       const doc = win.document;
       
-      // Remove File menu items
+      // Remove File menu items for import
       const newItemMenuItem = doc.getElementById('nanopub-import-new-item');
       if (newItemMenuItem) {
         newItemMenuItem.remove();
@@ -444,6 +521,27 @@ export class MenuManager {
       const separator = doc.getElementById('nanopub-separator');
       if (separator) {
         separator.remove();
+      }
+
+      // Remove nanopub creation menu items
+      const setupProfileItem = doc.getElementById('nanopub-setup-profile');
+      if (setupProfileItem) {
+        setupProfileItem.remove();
+      }
+
+      const createCitationItem = doc.getElementById('nanopub-create-citation');
+      if (createCitationItem) {
+        createCitationItem.remove();
+      }
+
+      const showProfileItem = doc.getElementById('nanopub-show-profile');
+      if (showProfileItem) {
+        showProfileItem.remove();
+      }
+
+      const creationSeparator = doc.getElementById('nanopub-creation-separator');
+      if (creationSeparator) {
+        creationSeparator.remove();
       }
 
       log("Menu items cleaned up");
