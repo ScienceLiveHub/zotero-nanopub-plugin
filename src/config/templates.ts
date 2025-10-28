@@ -30,6 +30,15 @@ export const POPULAR_TEMPLATES: NanopubTemplate[] = [
     keywords: ['citation', 'cito', 'reference', 'cite']
   },
   {
+    uri: 'https://w3id.org/np/RA24onqmqTMsraJ7ypYFOuckmNWpo4Zv5gsLqhXt7xYPU',
+    name: 'Annotate a paper quotation',
+    description: 'Annotating a paper quotation with personal interpretation',
+    category: 'Annotation',
+    icon: '❝❞',
+    recommended: true,
+    keywords: ['comment', 'annotation', 'quote', 'interpretation']
+  },
+  {
     uri: 'https://w3id.org/np/RAVEpTdLrX5XrhNl_gnvTaBcjRRSDu_hhZix8gu2HO7jI',
     name: 'Comment on Paper',
     description: 'Add comments, quotes, or evaluations to papers',
@@ -48,10 +57,10 @@ export const POPULAR_TEMPLATES: NanopubTemplate[] = [
     keywords: ['aida', 'claim', 'assertion', 'scientific']
   },
   {
-    uri: 'https://w3id.org/np/RAfM-b6K5SBdRcK13OiQzCHAuPe0AjGH8-7PuoOvY',
-    name: 'General Statement',
-    description: 'Make any general RDF statement',
-    category: 'General',
+    uri: 'https://w3id.org/np/RAsPVd3bNOPg5vxQGc1Tqn69v3dSY-ASrAhEFioutCXao',
+    name: 'Document geographical coverage',
+    description: 'Document the geographical area or region covered by a resercher paper, data, or study.',
+    category: 'geographical coverage',
     icon: '📝',
     recommended: false,
     keywords: ['statement', 'general', 'rdf', 'triple']

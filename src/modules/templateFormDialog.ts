@@ -110,7 +110,8 @@ export class TemplateFormDialog {
 
     console.log('[nanopub-view] Tab container found:', container);
 
-    // Create form container div
+    // Create form container div with minimal styling
+    // Let the nanopub-create library handle its own styles
     const formContainer = win.document.createElement('div');
     formContainer.id = 'nanopub-form-container';
     formContainer.style.cssText = `
@@ -118,57 +119,7 @@ export class TemplateFormDialog {
       width: 100%;
       height: 100%;
       overflow: auto;
-      background: #ffffff;
-      color: #000000;
     `;
-    
-    // Add a style element to the container itself (not to head which may not exist in XUL)
-    const styleElement = win.document.createElement('style');
-    styleElement.textContent = `
-      #nanopub-form-container * {
-        color: #000000 !important;
-      }
-      #nanopub-form-container button,
-      #nanopub-form-container input[type="button"],
-      #nanopub-form-container input[type="submit"] {
-        background-color: #0a84ff !important;
-        color: #ffffff !important;
-        border: none !important;
-        padding: 8px 16px !important;
-        border-radius: 4px !important;
-        cursor: pointer !important;
-        font-size: 14px !important;
-      }
-      #nanopub-form-container button:hover,
-      #nanopub-form-container input[type="button"]:hover,
-      #nanopub-form-container input[type="submit"]:hover {
-        background-color: #0060df !important;
-      }
-      #nanopub-form-container input[type="text"],
-      #nanopub-form-container input[type="url"],
-      #nanopub-form-container textarea,
-      #nanopub-form-container select {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border: 1px solid #cccccc !important;
-        padding: 6px !important;
-        border-radius: 3px !important;
-      }
-      #nanopub-form-container label {
-        color: #000000 !important;
-        font-weight: 500 !important;
-        display: block !important;
-        margin-bottom: 4px !important;
-      }
-    `;
-    
-    // Try to append to head if it exists, otherwise append to container
-    if (win.document.head) {
-      win.document.head.appendChild(styleElement);
-    } else {
-      // In XUL, just prepend the style element to the container
-      formContainer.appendChild(styleElement);
-    }
 
     // Clear any existing content and add our container
     container.innerHTML = '';
@@ -227,34 +178,50 @@ export class TemplateFormDialog {
 
       progressWin.close();
 
-      // Show success
-      const viewUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(result.uri)}`;
+      // Ensure we have the w3id.org format
+      let displayUri = result.uri;
+      if (!displayUri.includes('w3id.org')) {
+        // Extract the nanopub ID and convert to w3id.org format
+        const idMatch = displayUri.match(/\/np\/([A-Za-z0-9_-]+)/);
+        if (idMatch) {
+          displayUri = `https://w3id.org/np/${idMatch[1]}`;
+        }
+      }
+
+      // Show success with Nanodash link
+      const nanodashUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(displayUri)}`;
       
       const message = 
         `Successfully created and published!\n\n` +
-        `URI: ${result.uri}\n\n` +
-        `View at Nanodash:\n${viewUrl}\n\n` +
-        (preSelectedItem ? `Attach to selected item?` : 'Done!');
+        `Nanopublication URI:\n${displayUri}\n\n` +
+        `View at Nanodash:\n${nanodashUrl}\n\n` +
+        (preSelectedItem ? `Would you like to attach this nanopublication to the selected item as a note?` : 'Done!');
 
       if (preSelectedItem) {
-        const attach = Services.prompt.confirm(
+        const attachAsNote = Services.prompt.confirm(
           null,
-          'Success',
+          'Success - Nanopublication Published',
           message
         );
 
-        if (attach) {
-          await Zotero.Attachments.linkFromURL({
-            url: result.uri,
-            parentItemID: preSelectedItem.id,
-            title: 'Nanopublication',
-            contentType: 'application/x-research-info-systems'
-          });
+        if (attachAsNote) {
+          // Create a note with the nanopub information
+          const noteContent = `
+            <h2>Nanopublication</h2>
+            <p><strong>URI:</strong> <a href="${displayUri}">${displayUri}</a></p>
+            <p><strong>View:</strong> <a href="${nanodashUrl}">Open in Nanodash</a></p>
+            <p><em>Created: ${new Date().toLocaleString()}</em></p>
+          `;
 
-          console.log('[nanopub-view] Attached nanopub to item');
+          const note = new Zotero.Item('note');
+          note.parentID = preSelectedItem.id;
+          note.setNote(noteContent);
+          await note.saveTx();
+
+          console.log('[nanopub-view] Attached nanopub as note to item');
         }
       } else {
-        Services.prompt.alert(null, 'Success', message);
+        Services.prompt.alert(null, 'Success - Nanopublication Published', message);
       }
 
       // Close the tab
