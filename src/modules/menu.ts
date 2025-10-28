@@ -2,6 +2,8 @@
 import { log, error } from "../utils/logger";
 import { NanopubCreationDialog } from "./nanopubCreationDialog";
 import { TemplateFormDialog } from "./templateFormDialog";
+import { TemplateBrowser } from "./templateBrowser";
+import { TemplateFormDialog } from "./templateFormDialog";
 
 
 export class MenuManager {
@@ -134,7 +136,7 @@ export class MenuManager {
   }
 
   /**
-   * Register nanopub creation menu items
+   * Register nanopub creation menu items with dynamic template submenu
    */
   private registerNanopubCreationMenus() {
     try {
@@ -154,7 +156,7 @@ export class MenuManager {
 
       log("Adding nanopub creation menu items...");
 
-      // Create separator for creation items
+      // Create separator for nanopub items
       const creationSeparator = doc.createXULElement ? 
         doc.createXULElement('menuseparator') : 
         doc.createElement('menuseparator');
@@ -171,17 +173,6 @@ export class MenuManager {
         NanopubCreationDialog.showProfileSetupDialog();
       });
 
-      // Create Citation menu item
-      const createCitationItem = doc.createXULElement ? 
-        doc.createXULElement('menuitem') : 
-        doc.createElement('menuitem');
-      createCitationItem.id = 'nanopub-create-citation';
-      createCitationItem.setAttribute('label', 'Create Citation Nanopub from Item');
-      
-      createCitationItem.addEventListener('command', function() {
-        NanopubCreationDialog.showCreateCitationDialog();
-      });
-
       // Show Profile menu item
       const showProfileItem = doc.createXULElement ? 
         doc.createXULElement('menuitem') : 
@@ -193,11 +184,46 @@ export class MenuManager {
         NanopubCreationDialog.showProfileInfo();
       });
 
-      // Add to file menu
+      // Create main "Create Nanopublication" menu with submenu
+      const createNanopubMenu = doc.createXULElement ? 
+        doc.createXULElement('menu') : 
+        doc.createElement('menu');
+      createNanopubMenu.id = 'nanopub-create-menu';
+      createNanopubMenu.setAttribute('label', 'Create Nanopublication');
+
+      // Create submenu popup
+      const createNanopubPopup = doc.createXULElement ? 
+        doc.createXULElement('menupopup') : 
+        doc.createElement('menupopup');
+      createNanopubPopup.id = 'nanopub-create-popup';
+
+      // Dynamically add menu items for each template
+      const templates = TemplateBrowser.getPopularTemplates();
+      
+      templates.forEach((template, index) => {
+        const menuItem = doc.createXULElement ? 
+          doc.createXULElement('menuitem') : 
+          doc.createElement('menuitem');
+        
+        menuItem.id = `nanopub-template-${index}`;
+        menuItem.setAttribute('label', `${template.icon} ${template.name}`);
+        
+        // Capture template URI in closure
+        const templateUri = template.uri;
+        menuItem.addEventListener('command', function() {
+          TemplateFormDialog.showTemplateWorkflow(null, templateUri);
+        });
+        
+        createNanopubPopup.appendChild(menuItem);
+      });
+
+      createNanopubMenu.appendChild(createNanopubPopup);
+
+      // Add all items to file menu
       fileMenu.appendChild(creationSeparator);
       fileMenu.appendChild(setupProfileItem);
-      fileMenu.appendChild(createCitationItem);
       fileMenu.appendChild(showProfileItem);
+      fileMenu.appendChild(createNanopubMenu);
       
       log("Nanopub creation menu items added successfully");
     } catch (err: any) {
@@ -529,14 +555,14 @@ export class MenuManager {
         setupProfileItem.remove();
       }
 
-      const createCitationItem = doc.getElementById('nanopub-create-citation');
-      if (createCitationItem) {
-        createCitationItem.remove();
-      }
-
       const showProfileItem = doc.getElementById('nanopub-show-profile');
       if (showProfileItem) {
         showProfileItem.remove();
+      }
+
+      const createNanopubMenu = doc.getElementById('nanopub-create-menu');
+      if (createNanopubMenu) {
+        createNanopubMenu.remove();
       }
 
       const creationSeparator = doc.getElementById('nanopub-creation-separator');

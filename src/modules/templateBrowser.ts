@@ -1,65 +1,24 @@
 // src/modules/templateBrowser.ts
 // Template browser for selecting nanopub templates
 
+import { POPULAR_TEMPLATES, type NanopubTemplate } from '../config/templates';
+
 export class TemplateBrowser {
   
   /**
-   * Popular nanopub templates
-   * These are well-tested, widely-used templates
+   * Get the list of popular templates for menu generation
    */
-  static POPULAR_TEMPLATES = [
-    {
-      uri: 'https://w3id.org/np/RAX_4tWTyjFpO6nz63s14ucuejd64t2mK3IBlkwZ7jjLo',
-      name: 'Citation with CiTO',
-      description: 'Declare citations between papers using Citation Typing Ontology',
-      category: 'Citation',
-      icon: '📚'
-    },
-    {
-      uri: 'https://w3id.org/np/RAVEpTdLrX5XrhNl_gnvTaBcjRRSDu_hhZix8gu2HO7jI',
-      name: 'Comment on Paper',
-      description: 'Add comments, quotes, or evaluations to papers',
-      category: 'Annotation',
-      icon: '💬'
-    },
-    {
-      uri: 'https://w3id.org/np/RA4fmfVFULMP50FqDFX8fEMn66uDF07vXKFXh_L9aoQKE',
-      name: 'AIDA Sentence',
-      description: 'Make structured scientific claims following the AIDA model',
-      category: 'Scientific',
-      icon: '🔬'
-    },
-    {
-      uri: 'https://w3id.org/np/RAfM-b6K5SBdRcK
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-3OiQzCHAuPe0AjGH8-7PuoOvY',
-      name: 'General Statement',
-      description: 'Make any general RDF statement',
-      category: 'General',
-      icon: '📝'
-    }
-  ];
-
+  static getPopularTemplates(): NanopubTemplate[] {
+    return POPULAR_TEMPLATES;
+  }
+  
   /**
    * Show template browser dialog
    * Returns selected template URI or null if cancelled
    */
   static async showBrowser(): Promise<string | null> {
     try {
-      const templates = this.POPULAR_TEMPLATES;
+      const templates = POPULAR_TEMPLATES;
       
       // Create choices array with icons
       const choices = templates.map(t => `${t.icon} ${t.name} - ${t.description}`);
@@ -99,8 +58,8 @@ export class TemplateBrowser {
   /**
    * Get template info by URI
    */
-  static getTemplateInfo(uri: string) {
-    return this.POPULAR_TEMPLATES.find(t => t.uri === uri);
+  static getTemplateInfo(uri: string): NanopubTemplate | undefined {
+    return POPULAR_TEMPLATES.find(t => t.uri === uri);
   }
 
   /**

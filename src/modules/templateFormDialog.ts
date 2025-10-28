@@ -7,11 +7,11 @@ export class TemplateFormDialog {
   
   /**
    * Show the complete workflow:
-   * 1. Select template
+   * 1. Select template (or use preselected)
    * 2. Show form
    * 3. Create and publish nanopub
    */
-  static async showTemplateWorkflow(preSelectedItem?: Zotero.Item) {
+  static async showTemplateWorkflow(preSelectedItem?: Zotero.Item, preSelectedTemplateUri?: string) {
     try {
       // Step 1: Check profile
       const creator = Zotero.Nanopub.creator;
@@ -26,11 +26,15 @@ export class TemplateFormDialog {
         return;
       }
 
-      // Step 2: Select template
-      const templateUri = await TemplateBrowser.showBrowser();
+      // Step 2: Select template (or use preselected)
+      let templateUri = preSelectedTemplateUri;
       
       if (!templateUri) {
-        return; // User cancelled
+        templateUri = await TemplateBrowser.showBrowser();
+        
+        if (!templateUri) {
+          return; // User cancelled
+        }
       }
 
       // Step 3: Get selected item if not provided

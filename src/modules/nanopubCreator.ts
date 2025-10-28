@@ -1,4 +1,5 @@
-// src/modules/nanopubCreator.ts 
+// src/modules/nanopubCreator.ts - FINAL WORKING VERSION
+// Based on successful console testing
 
 import { createZoteroStorage } from "../utils/zoteroStorage";
 
