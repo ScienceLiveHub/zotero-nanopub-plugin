@@ -111,9 +111,21 @@ export class TemplateFormDialog {
     console.log('[nanopub-view] Tab container found:', container);
 
     // Create form container div with minimal styling
-    // Let the nanopub-create library handle its own styles
     const formContainer = win.document.createElement('div');
     formContainer.id = 'nanopub-form-container';
+    
+    // Detect and apply dark mode
+    console.log('[nanopub-view] Detecting dark mode for Zotero...');
+    const isDarkMode = this.isZoteroDarkMode(win);
+    console.log('[nanopub-view] Dark mode result:', isDarkMode);
+    
+    if (isDarkMode) {
+      formContainer.setAttribute('data-theme', 'dark');
+      // Also add as a class for CSS targeting
+      formContainer.classList.add('dark-mode');
+      console.log('[nanopub-view] ✅ Applied dark mode to container');
+    }
+    
     formContainer.style.cssText = `
       padding: 20px;
       width: 100%;
@@ -148,6 +160,159 @@ export class TemplateFormDialog {
       await creator.renderFromTemplateUri(templateUri, formContainer);
       
       console.log('[nanopub-view] Form rendered in tab');
+
+      // CRITICAL: Apply dark mode to all relevant elements after rendering
+      const isDarkMode = this.isZoteroDarkMode(win);
+      console.log('[nanopub-view] Applying dark mode:', isDarkMode);
+      
+      if (isDarkMode) {
+        // Apply to the container
+        formContainer.setAttribute('data-theme', 'dark');
+        formContainer.classList.add('dark-mode');
+        
+        // Apply to the nanopub-form element
+        const nanopubForm = formContainer.querySelector('.nanopub-form');
+        if (nanopubForm) {
+          nanopubForm.setAttribute('data-theme', 'dark');
+          nanopubForm.classList.add('dark-mode');
+          console.log('[nanopub-view] ✅ Applied dark mode to .nanopub-form');
+        }
+        
+        // Inject dark mode CSS variables directly as a style element
+        // Use better color combinations for readability
+        const mainDoc = win.document;
+        const styleEl = mainDoc.createElement('style');
+        styleEl.id = 'nanopub-dark-mode-override';
+        styleEl.textContent = `
+          /* Dark mode CSS variables */
+          #nanopub-form-container,
+          #nanopub-form-container .nanopub-form {
+            --primary: #ec4899 !important;
+            --primary-hover: #f472b6 !important;
+            --secondary: #9ca3af !important;
+            --secondary-dark: #6b7280 !important;
+            --text-dark: #f3f4f6 !important;
+            --text-light: #d1d5db !important;
+            --bg-white: #1f2937 !important;
+            --bg-light: #111827 !important;
+            --bg-subtle: #374151 !important;
+            --border: #4b5563 !important;
+            --border-light: #374151 !important;
+            --pink-light: #312e37 !important;
+            --pink-border: #ec4899 !important;
+          }
+          
+          /* Text colors - be specific, not everything */
+          #nanopub-form-container .field-label,
+          #nanopub-form-container .subject-label,
+          #nanopub-form-container .field-help,
+          #nanopub-form-container .field-hint,
+          #nanopub-form-container .toggle-label {
+            color: #f3f4f6 !important;
+          }
+          
+          /* Form inputs */
+          #nanopub-form-container .form-input,
+          #nanopub-form-container .form-select,
+          #nanopub-form-container .form-textarea {
+            background: #374151 !important;
+            color: #f3f4f6 !important;
+            border: 2px solid #6b7280 !important;
+          }
+          
+          /* Focus states - clean pink glow */
+          #nanopub-form-container .form-input:focus,
+          #nanopub-form-container .form-select:focus,
+          #nanopub-form-container .form-textarea:focus {
+            outline: none !important;
+            border-color: #ec4899 !important;
+            box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.3) !important;
+          }
+          
+          /* CRITICAL: Remove dotted outline from select in Firefox */
+          #nanopub-form-container select:-moz-focusring {
+            color: transparent !important;
+            text-shadow: 0 0 0 #f3f4f6 !important;
+          }
+          
+          #nanopub-form-container select::-moz-focus-inner {
+            border: 0 !important;
+          }
+          
+          /* Remove any focus ring */
+          #nanopub-form-container select:focus-visible {
+            outline: none !important;
+          }
+          
+          /* Placeholder text */
+          #nanopub-form-container .form-input::placeholder,
+          #nanopub-form-container .form-textarea::placeholder {
+            color: #9ca3af !important;
+          }
+          
+          /* Subject group */
+          #nanopub-form-container .subject-group {
+            background: #1f2937 !important;
+            border: 2px solid #ec4899 !important;
+          }
+          
+          /* Links */
+          #nanopub-form-container a {
+            color: #ec4899 !important;
+          }
+          
+          #nanopub-form-container a:hover {
+            color: #f472b6 !important;
+          }
+          
+          /* Buttons */
+          #nanopub-form-container .btn-primary {
+            background: #ec4899 !important;
+            color: #ffffff !important;
+            border: none !important;
+          }
+          
+          #nanopub-form-container .btn-secondary,
+          #nanopub-form-container .btn-add,
+          #nanopub-form-container .btn-add-field {
+            background: #6b7280 !important;
+            color: #ffffff !important;
+            border: none !important;
+          }
+          
+          /* Dropdown select - remove native styling */
+          #nanopub-form-container .form-select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23d1d5db' d='M6 9L1 4h10z'/%3E%3C/svg%3E") !important;
+            background-repeat: no-repeat !important;
+            background-position: right 12px center !important;
+            background-size: 12px !important;
+            -moz-appearance: none !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            width: 100% !important;
+            max-width: 400px !important;
+            padding-right: 36px !important;
+            box-sizing: border-box !important;
+          }
+          
+          /* Select options */
+          #nanopub-form-container .form-select option {
+            background: #374151 !important;
+            color: #f3f4f6 !important;
+          }
+        `;
+        
+        // Append to head if it exists, otherwise to documentElement
+        if (mainDoc.head) {
+          mainDoc.head.appendChild(styleEl);
+          console.log('[nanopub-view] ✅ Injected dark mode CSS override into head');
+        } else if (mainDoc.documentElement) {
+          mainDoc.documentElement.appendChild(styleEl);
+          console.log('[nanopub-view] ✅ Injected dark mode CSS override into documentElement');
+        } else {
+          console.warn('[nanopub-view] ⚠️ Could not inject dark mode CSS - no head or documentElement');
+        }
+      }
 
     } catch (error: any) {
       console.error('[nanopub-view ERROR] Failed to render form:', error);
@@ -238,6 +403,75 @@ export class TemplateFormDialog {
         'Error',
         `Failed to publish nanopublication:\n${error.message}`
       );
+    }
+  }
+
+  /**
+   * Detect if Zotero is in dark mode
+   * Uses multiple detection methods since Zotero's dark mode implementation may vary
+   */
+  private static isZoteroDarkMode(win: Window): boolean {
+    try {
+      const doc = win.document;
+      const body = doc.body || doc.documentElement;
+      
+      console.log('[nanopub-view] === Dark Mode Detection Debug ===');
+      
+      // Check 1: Explicit dark mode indicators
+      const hasExplicitDark = body.classList.contains('dark') || 
+                              body.classList.contains('dark-mode') ||
+                              body.getAttribute('data-theme') === 'dark';
+      console.log('[nanopub-view] Body classes:', Array.from(body.classList));
+      console.log('[nanopub-view] data-theme attribute:', body.getAttribute('data-theme'));
+      console.log('[nanopub-view] Has explicit dark indicator:', hasExplicitDark);
+      
+      if (hasExplicitDark) {
+        return true;
+      }
+      
+      // Check 2: Background color analysis
+      const bgColor = win.getComputedStyle(body).backgroundColor;
+      console.log('[nanopub-view] Body background color:', bgColor);
+      
+      if (bgColor) {
+        const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+          const r = parseInt(match[1]);
+          const g = parseInt(match[2]);
+          const b = parseInt(match[3]);
+          const brightness = (r + g + b) / 3;
+          
+          console.log('[nanopub-view] RGB values:', { r, g, b });
+          console.log('[nanopub-view] Brightness:', brightness);
+          console.log('[nanopub-view] Is dark (< 128)?:', brightness < 128);
+          
+          if (brightness < 128) {
+            return true;
+          }
+        }
+      }
+      
+      // Check 3: System preference
+      const systemPrefersDark = win.matchMedia && win.matchMedia('(prefers-color-scheme: dark)').matches;
+      console.log('[nanopub-view] System prefers dark:', systemPrefersDark);
+      
+      if (systemPrefersDark) {
+        return true;
+      }
+      
+      // Check 4: Look for dark colors in parent containers
+      let element: any = body;
+      for (let i = 0; i < 5 && element; i++) {
+        const color = win.getComputedStyle(element).backgroundColor;
+        console.log(`[nanopub-view] Checking element ${i} (${element.tagName}):`, color);
+        element = element.parentElement;
+      }
+      
+      console.log('[nanopub-view] === End Dark Mode Detection ===');
+      return false;
+    } catch (error) {
+      console.error('[nanopub-view] Error detecting dark mode:', error);
+      return false;
     }
   }
 }
