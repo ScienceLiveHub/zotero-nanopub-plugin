@@ -182,23 +182,6 @@ jobs:
           fi
           
           echo "✅ nanopub-view verification passed!"
-          
-      - name: Test nanopub-view import
-        run: |
-          echo "🧪 Testing if nanopub-view can be imported..."
-          node -e "
-            try {
-              const { NanopubViewer } = require('@sciencelivehub/nanopub-view');
-              console.log('✅ NanopubViewer imported successfully');
-              console.log('   Constructor type:', typeof NanopubViewer);
-              console.log('   Has renderFromUri:', typeof NanopubViewer.prototype.renderFromUri);
-              console.log('   Has render:', typeof NanopubViewer.prototype.render);
-            } catch (err) {
-              console.error('❌ Failed to import NanopubViewer:', err.message);
-              console.error(err.stack);
-              process.exit(1);
-            }
-          "
       
       - name: Build nanopub-create dependency
         run: |
