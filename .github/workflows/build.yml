@@ -135,6 +135,10 @@ jobs:
         run: |
           echo "🔍 Verifying nanopub-view build..."
           
+          # Show current directory
+          echo "📍 Current directory:"
+          pwd
+          
           # Log version info
           echo "📦 nanopub-view package info:"
           cd node_modules/@sciencelivehub/nanopub-view
@@ -144,9 +148,18 @@ jobs:
           cat package.json | grep '"version"' || echo "  (no version found)"
           cd ../..
           
+          # Show where we are after cd
+          echo "📍 After cd ../.. we are at:"
+          pwd
+          
+          # List what files actually exist
+          echo "📂 Files in nanopub-view/dist:"
+          ls -la node_modules/@sciencelivehub/nanopub-view/dist/ || echo "❌ Directory not found!"
+          
           # Check if critical files exist
           if [ ! -f "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js" ]; then
             echo "❌ ERROR: nanopub-viewer.esm.js not found!"
+            echo "Looking for: $(pwd)/node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js"
             exit 1
           fi
           
