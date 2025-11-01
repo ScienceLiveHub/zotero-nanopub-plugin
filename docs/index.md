@@ -1,41 +1,83 @@
 # Zotero Nanopublication Plugin
 
-Transform your research workflow into semantic knowledge creation.
+Transform your research workflow into semantic knowledge creation - **all within Zotero.**
 
 [Get Started](getting-started/installation.md){ .md-button .md-button--primary }
 [View on GitHub](https://github.com/ScienceLiveHub/zotero-nanopub-plugin){ .md-button }
 
+---
+
 ## What This Plugin Does
 
-The Zotero Nanopublication Plugin bridges the gap between traditional research management and the semantic web by enabling researchers to:
+The Zotero Nanopublication Plugin brings semantic web publishing **directly into Zotero** - no external websites, no context switching.
 
 !!! tip "Key Benefits"
 
-    - **🔗 Connect** your Zotero library to the nanopublication ecosystem
-    - **📝 Create** semantic statements from PDF annotations
-    - **🔍 Discover** related nanopublications from other researchers  
-    - **🤝 Collaborate** through machine-readable research claims
+    - **All In-Zotero** - Create nanopubs without leaving your workspace
+    - **Embedded Forms** - Smart forms generated from templates, rendered in Zotero tabs
+    - **Discover** - Find related nanopublications from other researchers
+    - **FAIR Principles** - Contribute to Findable, Accessible, Interoperable, Reusable science
+    - **ORCID Signed** - Cryptographically sign your work for proper attribution
+
+---
 
 ## Quick Overview
 
 === "For Readers"
 
-    Transform your reading notes into structured, citable statements that contribute to the global knowledge graph.
+    **Annotate your readings semantically.**  
+    Transform reading notes into structured, citable statements. Create nanopubs about papers as you read them - all in Zotero.
 
 === "For Reviewers"
 
-    Create semantic reviews and evaluations that other researchers can discover and build upon.
+    **Write machine-readable reviews.**  
+    Use CiTO (Citation Typing Ontology) to describe paper relationships. Others can discover and build upon your evaluations.
 
-=== "For Collaborators"
+=== "For Researchers"
 
-    Share structured research insights that integrate seamlessly across research teams.
+    **Publish semantic claims.**  
+    Make formal research assertions with AIDA templates. Your claims become part of the global knowledge graph, signed with your ORCID.
 
-## Latest Features
+---
 
-- ✅ **PDF Text Selection**: Create nanopubs directly from highlighted text
-- ✅ **Multiple Templates**: Support for CiTO, AIDA, and citation templates  
-- ✅ **Search Integration**: Discover existing nanopublications about your papers
-- ✅ **Rich Notes**: Generate structured notes with semantic metadata
+## Current Features (v2.0.0)
+
+- **In-Zotero Form Creation** - Entire workflow happens in Zotero tabs
+- **Template Browser** - Choose from popular templates with one click
+- **Multiple Templates** - CiTO, AIDA, geographical coverage, and more
+- **Auto-fill** - Paper metadata automatically populated
+- **Automatic Signing** - Uses WASM cryptography with your ORCID
+- **Direct Publishing** - Publishes to nanopub network instantly
+- **Rich Notes** - Beautiful display of nanopubs with `@sciencelivehub/nanopub-view`
+- **Search Integration** - Discover nanopubs about papers in your library
+- **Import/Attach** - Add nanopubs as items or attach as notes
+- **Dark Mode** - Seamless integration with Zotero's theme
+
+---
+
+## Coming Soon (v2.1.0)
+
+🚧 **PDF Text Selection** - Create nanopubs directly from highlighted text
+
+Want updates? [Watch the repository](https://github.com/ScienceLiveHub/zotero-nanopub-plugin) ⭐
+
+---
+
+## How It Works
+
+1. Right-click any paper in Zotero
+2. Choose "Create Nanopublication" → Select template
+3. Form opens in new Zotero tab (auto-filled with paper info)
+4. Fill in your content
+5. Click "Create & Publish"
+6. Plugin signs with your ORCID and publishes automatically
+7. Beautiful rich note attached to your item
+
+**No browser windows. No external websites. All in Zotero!**
+
+![Screenshot: Workflow diagram showing steps within Zotero interface](assets/images/annotated-screenshot-sequence.png)
+
+---
 
 ## Getting Help
 
@@ -43,32 +85,96 @@ The Zotero Nanopublication Plugin bridges the gap between traditional research m
 
     === "👤 For Users"
 
-        - **[Installation Guide](getting-started/installation.md)** - Get the plugin installed
-        - **[Quick Start](getting-started/quick-start.md)** - Create your first nanopub in 5 minutes
-        - **[Feature Guide](user-guide/features.md)** - Complete overview of all capabilities
+        - **[Installation Guide](getting-started/installation.md)** - Install in 2 minutes
+        - **[Quick Start](getting-started/quick-start.md)** - First nanopub in 5 minutes
+        - **[Feature Guide](user-guide/features.md)** - Complete capabilities overview
+        - **[Templates Guide](user-guide/templates.md)** - When to use which template
 
     === "🔧 For Developers"
 
-        - **[Architecture](technical/architecture.md)** - How the plugin works
-        - **[API Integration](technical/api-integration.md)** - Nanodash and nanopub APIs
-        - **[Contributing](development/contributing.md)** - Join the development
+        - **[Architecture](technical/architecture.md)** - How it works under the hood
+        - **[API Integration](technical/api-integration.md)** - Integration details
+        - **[Contributing](development/contributing.md)** - Join development
 
-    === "📚 Examples"
-
-        - **[Literature Review](examples/literature-review.md)** - Semantic literature reviews
-        - **[Research Collaboration](examples/research-collaboration.md)** - Team workflows
-        - **[Video Tutorials](examples/video-tutorials.md)** - Watch and learn
+---
 
 ## What are Nanopublications?
 
 !!! question "New to Nanopublications?"
 
-    Nanopublications are the smallest possible units of publishable information that represent scientific knowledge in a machine-readable format. They consist of:
+    Nanopublications are the smallest units of publishable information in machine-readable format:
     
-    - **Assertion**: The core scientific claim or statement
-    - **Provenance**: Information about how the assertion was made  
-    - **Publication Info**: Metadata about the nanopublication itself
+    - **Assertion** - The core claim or statement
+    - **Provenance** - Who made it, when, and how
+    - **Publication Info** - Metadata about the nanopub itself
     
-    This plugin helps researchers create nanopublications from their reading workflow, making their insights part of the broader semantic web of scientific knowledge.
+    This plugin helps you create nanopublications from your Zotero workflow, making your insights part of the semantic web of scientific knowledge.
 
-    [Learn More About Nanopublications](https://nanopub.net/){ .md-button }
+    [Learn More →](http://nanopub.net){ .md-button }
+
+---
+
+## Part of Science Live Platform
+
+This plugin is part of [Science Live](https://sciencelive4all.org) - transforming research into connected, FAIR knowledge bricks.
+
+**Science Live enables:**
+
+- 🧱 **Knowledge Bricks**: Stackable, reusable research components
+- 🎯 **FAIR Principles**: Findable, Accessible, Interoperable, Reusable
+- 💰 **Credit System**: Recognition for quality contributions *(coming soon)*
+- 🌍 **Open Science**: Transparent, collaborative research
+
+**Roadmap Integration:**
+
+- January 2026: Beta launch
+- June 2026: Public launch
+- Credit system integration
+- Travel fund for contributors
+
+[Visit Science Live →](https://sciencelive4all.org){ .md-button }
+
+---
+
+## System Requirements
+
+- **Zotero:** Version 7.0 or later
+- **Internet:** Required for loading templates and publishing
+- **ORCID:** Free account at [orcid.org](https://orcid.org)
+
+**Supported Platforms:**
+
+- Windows 10/11
+- macOS 11+ (Intel and Apple Silicon)
+- Linux (Ubuntu 20.04+, Fedora 34+)
+
+---
+
+## Quick Links
+
+- 📖 [Documentation](getting-started/installation.md)
+- 💻 [GitHub Repository](https://github.com/ScienceLiveHub/zotero-nanopub-plugin)
+- 🐛 [Report Issue](https://github.com/ScienceLiveHub/zotero-nanopub-plugin/issues)
+- 🌐 [Science Live](https://sciencelive4all.org)
+
+---
+
+## License & Credits
+
+**License:** MIT
+
+**Created by:** [ScienceLiveHub](https://github.com/ScienceLiveHub)  
+**Contact:** contact@vitenhub.no
+
+**Built with:**
+
+- [@sciencelivehub/nanopub-create](https://github.com/ScienceLiveHub/nanopub-create) - Form generation and signing
+- [@sciencelivehub/nanopub-view](https://github.com/ScienceLiveHub/nanopub-view) - Rich note display
+- [nanopub-rs](https://github.com/vemonet/nanopub-rs) - WASM signing library
+
+**Powered by:** [Nanopublication Network](http://nanopub.net) via [Knowledge Pixels](https://knowledgepixels.com)
+
+---
+
+**Start publishing semantic knowledge today!** 🚀
+
