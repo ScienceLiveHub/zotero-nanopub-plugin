@@ -108,13 +108,22 @@ jobs:
           echo "📂 Build output:"
           ls -lah dist/ || echo "❌ No dist directory created!"
           
+          echo "🔍 Checking CSS files..."
+          ls -la dist/*.css
+          
           # Rename style.css to nanopub-viewer.css if it exists
-          if [ -f "dist/style.css" ] && [ ! -f "dist/nanopub-viewer.css" ]; then
-            echo "📝 Renaming style.css to nanopub-viewer.css..."
-            mv dist/style.css dist/nanopub-viewer.css
+          if [ -f "dist/style.css" ]; then
+            echo "📝 Found style.css, renaming to nanopub-viewer.css..."
+            mv -v dist/style.css dist/nanopub-viewer.css
           fi
           
-          echo "📂 Final dist contents:"
+          # Rename nanopub-view.css to nanopub-viewer.css if it exists  
+          if [ -f "dist/nanopub-view.css" ]; then
+            echo "📝 Found nanopub-view.css, renaming to nanopub-viewer.css..."
+            mv -v dist/nanopub-view.css dist/nanopub-viewer.css
+          fi
+          
+          echo "📂 Final dist contents after rename:"
           ls -lah dist/
           
           cd ../../..
