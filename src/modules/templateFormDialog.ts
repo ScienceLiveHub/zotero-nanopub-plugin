@@ -1,14 +1,10 @@
 // src/modules/templateFormDialog.ts
-// Template form dialog - creates a proper Zotero tab with the form
+// Template form dialog - FIXED VERSION with aggressive collapsible header styling
 
 export class TemplateFormDialog {
   
-  /**
-   * Show template workflow by creating a new tab
-   */
   static async showTemplateWorkflow(preSelectedItem?: Zotero.Item, preSelectedTemplateUri?: string) {
     try {
-      // Step 1: Check profile
       const creator = Zotero.Nanopub.creator;
       
       if (!creator.hasProfile()) {
@@ -21,7 +17,6 @@ export class TemplateFormDialog {
         return;
       }
 
-      // Step 2: Get template URI
       let templateUri = preSelectedTemplateUri;
       
       if (!templateUri) {
@@ -29,11 +24,10 @@ export class TemplateFormDialog {
         templateUri = await TemplateBrowser.showBrowser();
         
         if (!templateUri) {
-          return; // User cancelled
+          return;
         }
       }
 
-      // Step 3: Create a new tab with the form
       await this.createFormTab(templateUri, preSelectedItem);
 
     } catch (error: any) {
@@ -47,83 +41,48 @@ export class TemplateFormDialog {
     }
   }
 
-  /**
-   * Create a new tab in Zotero with the template form
-   */
   private static async createFormTab(templateUri: string, preSelectedItem?: Zotero.Item) {
     const win = Zotero.getMainWindow();
     
-    // Create a new tab - this returns a tab object, not a string ID
     const tab = win.Zotero_Tabs.add({
       type: 'library',
       title: 'Create Nanopublication',
-      select: true, // Switch to this tab
+      select: true,
       data: {
         templateUri,
         preSelectedItem
       }
     });
 
-    console.log('[nanopub-view] Created tab:', tab);
-    console.log('[nanopub-view] Tab ID:', tab.id);
-    console.log('[nanopub-view] Tab object keys:', Object.keys(tab));
+    console.log('[nanopub-view] Created tab:', tab.id);
     
-    // Wait a bit for the tab to be fully initialized
     await Zotero.Promise.delay(200);
 
-    // Try different approaches to get the container
-    let container = null;
-    
-    // Approach 1: Check if tab has a container property
-    if (tab.container) {
-      console.log('[nanopub-view] Using tab.container');
-      container = tab.container;
-    }
-    // Approach 2: Check for deck/panel
-    else if (tab.deck) {
-      console.log('[nanopub-view] Using tab.deck');
-      container = tab.deck;
-    }
-    // Approach 3: Query the tab element itself
-    else {
+    let container = tab.container || tab.deck;
+    if (!container) {
       const tabElement = win.document.getElementById(tab.id);
-      console.log('[nanopub-view] Tab element:', tabElement);
-      
       if (tabElement) {
-        // The tab might be the container itself, or we need its content area
         container = tabElement.querySelector('.tab-content') || 
                    tabElement.querySelector('[role="tabpanel"]') ||
                    tabElement;
-        console.log('[nanopub-view] Found container via query:', container);
       }
     }
     
     if (!container) {
-      console.error('[nanopub-view ERROR] Could not find tab container');
-      console.error('[nanopub-view ERROR] Tab properties:', tab);
-      console.error('[nanopub-view ERROR] Available elements with tab ID:', 
-        Array.from(win.document.querySelectorAll(`[id*="${tab.id}"]`))
-          .map((el: Element) => `${el.tagName}#${el.id}`)
-      );
       throw new Error('Could not find tab container');
     }
 
-    console.log('[nanopub-view] Tab container found:', container);
-
-    // Create form container div with minimal styling
     const formContainer = win.document.createElement('div');
     formContainer.id = 'nanopub-form-container';
     
-    // Detect and apply dark mode
-    console.log('[nanopub-view] Detecting dark mode for Zotero...');
+    // CRITICAL: Detect and apply dark mode classes
     const isDarkMode = this.isZoteroDarkMode(win);
-    console.log('[nanopub-view] Dark mode result:', isDarkMode);
+    console.log('[nanopub-view] 🌙 Dark mode detected:', isDarkMode);
     
     if (isDarkMode) {
       formContainer.setAttribute('data-theme', 'dark');
-      // Also add as a class for CSS targeting
       formContainer.classList.add('dark-mode');
-      console.log('[nanopub-view] ✅ Applied dark mode to container');
+      formContainer.classList.add('dark');
     }
     
     formContainer.style.cssText = `
@@ -133,203 +92,583 @@ export class TemplateFormDialog {
       overflow: auto;
     `;
 
-    // Clear any existing content and add our container
     container.innerHTML = '';
     container.appendChild(formContainer);
 
     try {
       const creator = Zotero.Nanopub.creator;
       
-      console.log('[nanopub-view] Rendering form in tab...');
+      console.log('[nanopub-view] Rendering form...');
 
-      // Store generated TriG content
       let generatedTrigContent: string | null = null;
 
-      // Listen for submit event
       const submitHandler = (data: any) => {
-        console.log('[nanopub-view] Submit event received');
         generatedTrigContent = data.trigContent;
-        
-        // Show publish button or handle automatically
         this.handleFormSubmit(generatedTrigContent, preSelectedItem, tab.id);
       };
 
       creator.on('submit', submitHandler);
-
-      // Render the form
       await creator.renderFromTemplateUri(templateUri, formContainer);
       
-      console.log('[nanopub-view] Form rendered in tab');
+      console.log('[nanopub-view] ✅ Form rendered successfully');
 
-      // CRITICAL: Apply dark mode to all relevant elements after rendering
-      const isDarkMode = this.isZoteroDarkMode(win);
-      console.log('[nanopub-view] Applying dark mode:', isDarkMode);
-      
+      // 🔥 APPLY DARK MODE STYLES AFTER RENDERING
       if (isDarkMode) {
-        // Apply to the container
-        formContainer.setAttribute('data-theme', 'dark');
-        formContainer.classList.add('dark-mode');
-        
-        // Apply to the nanopub-form element
-        const nanopubForm = formContainer.querySelector('.nanopub-form');
-        if (nanopubForm) {
-          nanopubForm.setAttribute('data-theme', 'dark');
-          nanopubForm.classList.add('dark-mode');
-          console.log('[nanopub-view] ✅ Applied dark mode to .nanopub-form');
-        }
-        
-        // Inject dark mode CSS variables directly as a style element
-        // Use better color combinations for readability
-        const mainDoc = win.document;
-        const styleEl = mainDoc.createElement('style');
-        styleEl.id = 'nanopub-dark-mode-override';
-        styleEl.textContent = `
-          /* Dark mode CSS variables */
-          #nanopub-form-container,
-          #nanopub-form-container .nanopub-form {
-            --primary: #ec4899 !important;
-            --primary-hover: #f472b6 !important;
-            --secondary: #9ca3af !important;
-            --secondary-dark: #6b7280 !important;
-            --text-dark: #f3f4f6 !important;
-            --text-light: #d1d5db !important;
-            --bg-white: #1f2937 !important;
-            --bg-light: #111827 !important;
-            --bg-subtle: #374151 !important;
-            --border: #4b5563 !important;
-            --border-light: #374151 !important;
-            --pink-light: #312e37 !important;
-            --pink-border: #ec4899 !important;
-          }
-          
-          /* Text colors - be specific, not everything */
-          #nanopub-form-container .field-label,
-          #nanopub-form-container .subject-label,
-          #nanopub-form-container .field-help,
-          #nanopub-form-container .field-hint,
-          #nanopub-form-container .toggle-label {
-            color: #f3f4f6 !important;
-          }
-          
-          /* Form inputs */
-          #nanopub-form-container .form-input,
-          #nanopub-form-container .form-select,
-          #nanopub-form-container .form-textarea {
-            background: #374151 !important;
-            color: #f3f4f6 !important;
-            border: 2px solid #6b7280 !important;
-          }
-          
-          /* Focus states - clean pink glow */
-          #nanopub-form-container .form-input:focus,
-          #nanopub-form-container .form-select:focus,
-          #nanopub-form-container .form-textarea:focus {
-            outline: none !important;
-            border-color: #ec4899 !important;
-            box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.3) !important;
-          }
-          
-          /* CRITICAL: Remove dotted outline from select in Firefox */
-          #nanopub-form-container select:-moz-focusring {
-            color: transparent !important;
-            text-shadow: 0 0 0 #f3f4f6 !important;
-          }
-          
-          #nanopub-form-container select::-moz-focus-inner {
-            border: 0 !important;
-          }
-          
-          /* Remove any focus ring */
-          #nanopub-form-container select:focus-visible {
-            outline: none !important;
-          }
-          
-          /* Placeholder text */
-          #nanopub-form-container .form-input::placeholder,
-          #nanopub-form-container .form-textarea::placeholder {
-            color: #9ca3af !important;
-          }
-          
-          /* Subject group */
-          #nanopub-form-container .subject-group {
-            background: #1f2937 !important;
-            border: 2px solid #ec4899 !important;
-          }
-          
-          /* Links */
-          #nanopub-form-container a {
-            color: #ec4899 !important;
-          }
-          
-          #nanopub-form-container a:hover {
-            color: #f472b6 !important;
-          }
-          
-          /* Buttons */
-          #nanopub-form-container .btn-primary {
-            background: #ec4899 !important;
-            color: #ffffff !important;
-            border: none !important;
-          }
-          
-          #nanopub-form-container .btn-secondary,
-          #nanopub-form-container .btn-add,
-          #nanopub-form-container .btn-add-field {
-            background: #6b7280 !important;
-            color: #ffffff !important;
-            border: none !important;
-          }
-          
-          /* Dropdown select - remove native styling */
-          #nanopub-form-container .form-select {
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23d1d5db' d='M6 9L1 4h10z'/%3E%3C/svg%3E") !important;
-            background-repeat: no-repeat !important;
-            background-position: right 12px center !important;
-            background-size: 12px !important;
-            -moz-appearance: none !important;
-            -webkit-appearance: none !important;
-            appearance: none !important;
-            width: 100% !important;
-            max-width: 400px !important;
-            padding-right: 36px !important;
-            box-sizing: border-box !important;
-          }
-          
-          /* Select options */
-          #nanopub-form-container .form-select option {
-            background: #374151 !important;
-            color: #f3f4f6 !important;
-          }
-        `;
-        
-        // Append to head if it exists, otherwise to documentElement
-        if (mainDoc.head) {
-          mainDoc.head.appendChild(styleEl);
-          console.log('[nanopub-view] ✅ Injected dark mode CSS override into head');
-        } else if (mainDoc.documentElement) {
-          mainDoc.documentElement.appendChild(styleEl);
-          console.log('[nanopub-view] ✅ Injected dark mode CSS override into documentElement');
-        } else {
-          console.warn('[nanopub-view] ⚠️ Could not inject dark mode CSS - no head or documentElement');
-        }
+        console.log('[nanopub-view] Applying dark mode styles AFTER render...');
+        this.applyDarkModeStyles(formContainer);
       }
+
+      // Inject styles into the container
+      this.injectStyles(formContainer, isDarkMode);
 
     } catch (error: any) {
       console.error('[nanopub-view ERROR] Failed to render form:', error);
       
       formContainer.innerHTML = `
-        <div style="padding: 40px;">
+        <div style="padding: 40px; color: ${isDarkMode ? '#fff' : '#000'};">
           <h2 style="color: #d32f2f;">Error Loading Template</h2>
           <p>Failed to load the template form:</p>
-          <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow: auto;">${error.message}</pre>
+          <pre style="background: ${isDarkMode ? '#2d2d2d' : '#f5f5f5'}; padding: 15px; border-radius: 4px; overflow: auto;">${error.message}</pre>
         </div>
       `;
     }
   }
 
   /**
-   * Handle form submission
+   * Apply dark mode styles directly to elements using JavaScript
+   * This bypasses CSS variable issues in Zotero's rendering context
    */
+  private static applyDarkModeStyles(container: HTMLElement): void {
+    console.log('[nanopub-view] 🎨 Applying dark mode styles directly to elements...');
+    
+    const applyStyles = () => {
+      console.log('[nanopub-view] --- Running applyStyles ---');
+      console.log('[nanopub-view] Container children count:', container.children.length);
+      
+      // Container itself
+      container.style.backgroundColor = '#111827';
+      container.style.color = '#e5e5e5';
+      
+      // Subject groups (the pink boxes)
+      const subjectGroups = container.querySelectorAll('.subject-group');
+      console.log('[nanopub-view] Found', subjectGroups.length, '.subject-group elements');
+      subjectGroups.forEach((el: Element) => {
+        (el as any).style.backgroundColor = '#3d2432';
+        (el as any).style.borderColor = '#ff3d8f';
+        (el as any).style.color = '#e5e5e5';
+        (el as any).style.width = '100%';
+        (el as any).style.maxWidth = '100%';
+        (el as any).style.boxSizing = 'border-box';
+        (el as any).style.overflow = 'hidden';
+      });
+      
+      // All labels
+      const labels = container.querySelectorAll('label, .field-label, .subject-label');
+      console.log('[nanopub-view] Found', labels.length, 'label elements');
+      labels.forEach((el: Element) => {
+        (el as any).style.color = '#e5e5e5';
+        (el as any).style.fontWeight = '600';
+      });
+      
+      // AGGRESSIVE: Find ANY element that contains "OPTIONAL" text or has clickable styling
+      // This should catch the collapsible headers
+      const allElements = container.querySelectorAll('*');
+      let collapsibleCount = 0;
+      allElements.forEach((el: Element) => {
+        // Skip style tags, script tags, and other non-visual elements
+        const tagName = el.tagName ? el.tagName.toLowerCase() : '';
+        if (tagName === 'style' || tagName === 'script' || tagName === 'link' || tagName === 'meta' ||
+            tagName === 'input' || tagName === 'textarea' || tagName === 'select' || tagName === 'button') {
+          return;
+        }
+        
+        const text = (el as any).textContent || '';
+        const style = (el as any).style;
+        
+        // Skip elements with very long text content (could be CSS or large containers)
+        if (text.length > 300) {
+          return;
+        }
+        
+        // Skip elements with very short text (like lone arrows or emojis)
+        if (text.trim().length < 15) {
+          return;
+        }
+        
+        // Additional check: skip if it contains CSS-like content
+        if (text.includes('===') || text.includes('--bg-') || text.includes('--text-') || 
+            text.includes('{') || text.includes('/*') || text.includes('var(') || 
+            text.includes('#nanopub-form') || text.includes('.subject-group')) {
+          return;
+        }
+        
+        // Check if it's a parent container, not the actual header
+        const children = (el as any).children;
+        if (children && children.length > 5) {
+          return; // Skip large containers
+        }
+        
+        // Must have cursor pointer to be considered
+        const hasCursorPointer = style.cursor === 'pointer' || (el as any).onclick;
+        if (!hasCursorPointer) {
+          return;
+        }
+        
+        // Now check if it has collapsible-like content
+        const hasOptionalText = text.includes('OPTIONAL');
+        const hasGeometryIcon = text.includes('📍');
+        const hasRelevantText = hasOptionalText || hasGeometryIcon || 
+                               text.includes('details') || text.includes('bounding');
+        
+        if (hasRelevantText) {
+          collapsibleCount++;
+          console.log('[nanopub-view] Styling potential collapsible:', text.substring(0, 50));
+          
+          (el as any).style.backgroundColor = '#2d2d2d';
+          (el as any).style.color = '#e5e5e5';
+          (el as any).style.padding = '10px 12px';
+          (el as any).style.borderRadius = '6px';
+          (el as any).style.cursor = 'pointer';
+          (el as any).style.fontWeight = '600';
+          (el as any).style.marginBottom = '8px';
+          (el as any).style.width = '100%';
+          (el as any).style.maxWidth = '100%';
+          (el as any).style.boxSizing = 'border-box';
+          (el as any).style.display = 'flex';
+          (el as any).style.justifyContent = 'space-between';
+          (el as any).style.alignItems = 'center';
+          (el as any).style.flexWrap = 'nowrap';
+          
+          // Fix any child elements that might be causing layout issues
+          // Reuse children variable from above
+          if (children) {
+            for (let i = 0; i < children.length; i++) {
+              const child = children[i];
+              // If it's the OPTIONAL badge, ensure it doesn't cause wrapping
+              if (child.textContent && child.textContent.includes('OPTIONAL')) {
+                child.style.flexShrink = '0';
+                child.style.marginLeft = '8px';
+              }
+            }
+          }
+        }
+      });
+      console.log('[nanopub-view] Found', collapsibleCount, 'potential collapsible elements');
+      
+      // All text elements
+      const textElements = container.querySelectorAll('p, span, div:not(.form-input):not(input):not(textarea), legend, h1, h2, h3, h4, h5, h6');
+      console.log('[nanopub-view] Found', textElements.length, 'text elements');
+      textElements.forEach((el: Element) => {
+        if (!el.matches || !el.matches('input, textarea, select, button')) {
+          (el as any).style.color = '#e5e5e5';
+        }
+      });
+      
+      // Help text and hints
+      const helpText = container.querySelectorAll('.field-help, .field-hint, small');
+      console.log('[nanopub-view] Found', helpText.length, 'help text elements');
+      helpText.forEach((el: Element) => {
+        (el as any).style.color = '#a0a0a0';
+      });
+      
+      // All inputs, textareas, selects
+      const inputs = container.querySelectorAll('input:not([type="submit"]):not([type="button"]), textarea, select, .form-input, .form-textarea, .form-select');
+      console.log('[nanopub-view] Found', inputs.length, 'input elements');
+      inputs.forEach((el: Element) => {
+        (el as any).style.backgroundColor = '#1e1e1e';
+        (el as any).style.color = '#e5e5e5';
+        (el as any).style.borderColor = '#525252';
+        (el as any).style.borderWidth = '2px';
+        (el as any).style.borderStyle = 'solid';
+        (el as any).style.boxSizing = 'border-box';
+        (el as any).style.maxWidth = '100%';
+        (el as any).style.width = '100%';
+      });
+      
+      // Select options
+      const selects = container.querySelectorAll('select');
+      console.log('[nanopub-view] Found', selects.length, 'select elements');
+      selects.forEach((select: Element) => {
+        const options = (select as any).querySelectorAll('option');
+        options.forEach((option: any) => {
+          option.style.backgroundColor = '#1e1e1e';
+          option.style.color = '#e5e5e5';
+        });
+      });
+      
+      // OPTIONAL badges - make them visible with dark color
+      const optionalBadges = container.querySelectorAll('.optional-badge, [class*="optional"]');
+      console.log('[nanopub-view] Found', optionalBadges.length, 'optional badge elements');
+      optionalBadges.forEach((el: Element) => {
+        const text = (el as any).textContent || '';
+        if (text.includes('OPTIONAL')) {
+          (el as any).style.backgroundColor = '#1e3a5f';
+          (el as any).style.color = '#ffffff';
+          (el as any).style.padding = '3px 8px';
+          (el as any).style.borderRadius = '4px';
+          (el as any).style.fontSize = '0.75em';
+          (el as any).style.fontWeight = '600';
+          (el as any).style.display = 'inline-block';
+          (el as any).style.marginLeft = '8px';
+        }
+      });
+      
+      // Also find any text node containing just "OPTIONAL" and style its parent
+      const allTextElements = container.querySelectorAll('*');
+      allTextElements.forEach((el: Element) => {
+        const text = (el as any).textContent || '';
+        // If element text is exactly "OPTIONAL" or " OPTIONAL" or "OPTIONAL "
+        if (text.trim() === 'OPTIONAL' && (el as any).children.length === 0) {
+          (el as any).style.backgroundColor = '#1e3a5f';
+          (el as any).style.color = '#ffffff';
+          (el as any).style.padding = '3px 8px';
+          (el as any).style.borderRadius = '4px';
+          (el as any).style.fontSize = '0.75em';
+          (el as any).style.fontWeight = '600';
+          (el as any).style.display = 'inline-block';
+          (el as any).style.marginLeft = '8px';
+        }
+      });
+      
+      // Buttons
+      const buttons = container.querySelectorAll('button, .btn-primary, [type="submit"]');
+      console.log('[nanopub-view] Found', buttons.length, 'button elements');
+      buttons.forEach((el: Element) => {
+        (el as any).style.backgroundColor = '#ff3d8f';
+        (el as any).style.color = '#ffffff';
+        (el as any).style.padding = '12px 24px';
+        (el as any).style.minHeight = '44px';
+        (el as any).style.display = 'inline-flex';
+        (el as any).style.alignItems = 'center';
+        (el as any).style.justifyContent = 'center';
+        (el as any).style.fontWeight = '600';
+        (el as any).style.fontSize = '1em';
+        (el as any).style.lineHeight = '1.5';
+      });
+      
+      console.log('[nanopub-view] --- applyStyles complete ---');
+    };
+    
+    // Apply immediately and multiple times to catch delayed rendering
+    applyStyles();
+    setTimeout(() => applyStyles(), 100);
+    setTimeout(() => applyStyles(), 300);
+    setTimeout(() => applyStyles(), 500);
+    setTimeout(() => applyStyles(), 1000);
+    setTimeout(() => applyStyles(), 2000);
+    
+    console.log('[nanopub-view] ✅ Dark mode style application scheduled');
+  }
+
+  private static injectStyles(container: HTMLElement, isDarkMode: boolean): void {
+    const styleEl = container.ownerDocument.createElement('style');
+    styleEl.id = 'nanopub-form-styles';
+    
+    styleEl.textContent = `
+      /* ===== CSS VARIABLES ===== */
+      
+      #nanopub-form-container {
+        /* Light mode */
+        --bg-main: #ffffff;
+        --bg-subtle: #f5f5f5;
+        --bg-subject: #fef0f7;
+        --border-main: #e5e7eb;
+        --border-subject: #BE2E78;
+        --text-dark: #1f2937;
+        --text-light: #6b7280;
+        --input-bg: #ffffff;
+        --input-border: #d1d5db;
+        --input-text: #1f2937;
+        --button-bg: #BE2E78;
+        --button-text: #ffffff;
+      }
+
+      /* Dark mode variables */
+      #nanopub-form-container[data-theme="dark"],
+      #nanopub-form-container.dark-mode,
+      #nanopub-form-container.dark {
+        --bg-main: #111827;
+        --bg-subtle: #1f2937;
+        --bg-subject: #3d2432;
+        --border-main: #374151;
+        --border-subject: #ff3d8f;
+        --text-dark: #e5e5e5;
+        --text-light: #a0a0a0;
+        --input-bg: #1e1e1e;
+        --input-border: #525252;
+        --input-text: #e5e5e5;
+        --button-bg: #ff3d8f;
+        --button-text: #ffffff;
+      }
+
+      /* ===== BASE STYLES ===== */
+      
+      #nanopub-form-container {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg-main);
+        color: var(--text-dark);
+        line-height: 1.6;
+        overflow-x: hidden;
+        max-width: 100%;
+      }
+      
+      /* Ensure all child elements respect container width */
+      #nanopub-form-container * {
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+
+      /* ===== FORM CONTROLS ===== */
+      
+      .form-input,
+      input:not([type="submit"]):not([type="button"]),
+      textarea,
+      select {
+        width: 100%;
+        max-width: 100%;
+        padding: 10px 12px;
+        background: var(--input-bg);
+        color: var(--input-text);
+        border: 2px solid var(--input-border);
+        border-radius: 6px;
+        font-size: 0.95em;
+        font-family: inherit;
+        transition: border-color 0.2s, background-color 0.2s;
+        box-sizing: border-box;
+      }
+
+      .form-input:focus,
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--border-subject);
+      }
+      
+      /* Select dropdown options */
+      select option {
+        background: var(--input-bg);
+        color: var(--input-text);
+      }
+
+      /* Buttons */
+      button,
+      .btn-primary,
+      input[type="submit"],
+      input[type="button"] {
+        padding: 12px 24px;
+        min-height: 44px;
+        background: var(--button-bg);
+        color: var(--button-text);
+        border: 2px solid var(--button-bg);
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 1em;
+        line-height: 1.5;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      button:hover,
+      .btn-primary:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+
+      /* ===== SUBJECT GROUPS ===== */
+      
+      .subject-group {
+        background: var(--bg-subject);
+        border: 2px solid var(--border-subject);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+      
+      /* DIRECT FALLBACK for dark mode if variables fail */
+      #nanopub-form-container[data-theme="dark"] .subject-group,
+      #nanopub-form-container.dark-mode .subject-group,
+      #nanopub-form-container.dark .subject-group {
+        background: #3d2432 !important;
+        border-color: #ff3d8f !important;
+      }
+
+      .subject-field {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid rgba(190, 46, 120, 0.2);
+      }
+
+      .subject-label {
+        font-weight: 600;
+        font-size: 1.15em;
+        color: var(--text-dark);
+        margin-bottom: 0.75rem;
+        display: block;
+      }
+      
+      /* ===== COLLAPSIBLE SECTIONS - AGGRESSIVE STYLING ===== */
+      
+      /* Target any element with cursor pointer that might be a collapsible header */
+      #nanopub-form-container [style*="cursor: pointer"],
+      #nanopub-form-container [style*="cursor:pointer"] {
+        background: var(--bg-subtle) !important;
+        color: var(--text-dark) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+      }
+      
+      /* Dark mode for collapsibles */
+      #nanopub-form-container[data-theme="dark"] [style*="cursor: pointer"],
+      #nanopub-form-container.dark-mode [style*="cursor: pointer"],
+      #nanopub-form-container.dark [style*="cursor: pointer"],
+      #nanopub-form-container[data-theme="dark"] [style*="cursor:pointer"],
+      #nanopub-form-container.dark-mode [style*="cursor:pointer"],
+      #nanopub-form-container.dark [style*="cursor:pointer"] {
+        background: #2d2d2d !important;
+        color: #e5e5e5 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        flex-wrap: nowrap !important;
+      }
+      
+      /* DIRECT FALLBACK for dark mode text */
+      #nanopub-form-container[data-theme="dark"] .subject-label,
+      #nanopub-form-container.dark-mode .subject-label,
+      #nanopub-form-container.dark .subject-label,
+      #nanopub-form-container[data-theme="dark"] .field-label,
+      #nanopub-form-container.dark-mode .field-label,
+      #nanopub-form-container.dark .field-label,
+      #nanopub-form-container[data-theme="dark"] label,
+      #nanopub-form-container.dark-mode label,
+      #nanopub-form-container.dark label,
+      #nanopub-form-container[data-theme="dark"] p,
+      #nanopub-form-container.dark-mode p,
+      #nanopub-form-container.dark p,
+      #nanopub-form-container[data-theme="dark"] span,
+      #nanopub-form-container.dark-mode span,
+      #nanopub-form-container.dark span,
+      #nanopub-form-container[data-theme="dark"] div,
+      #nanopub-form-container.dark-mode div,
+      #nanopub-form-container.dark div {
+        color: #e5e5e5 !important;
+      }
+
+      /* DIRECT FALLBACK for inputs */
+      #nanopub-form-container[data-theme="dark"] input,
+      #nanopub-form-container.dark-mode input,
+      #nanopub-form-container.dark input,
+      #nanopub-form-container[data-theme="dark"] textarea,
+      #nanopub-form-container.dark-mode textarea,
+      #nanopub-form-container.dark textarea,
+      #nanopub-form-container[data-theme="dark"] select,
+      #nanopub-form-container.dark-mode select,
+      #nanopub-form-container.dark select {
+        background: #1e1e1e !important;
+        color: #e5e5e5 !important;
+        border-color: #525252 !important;
+      }
+      
+      /* DIRECT FALLBACK for select options */
+      #nanopub-form-container[data-theme="dark"] select option,
+      #nanopub-form-container.dark-mode select option,
+      #nanopub-form-container.dark select option {
+        background: #1e1e1e !important;
+        color: #e5e5e5 !important;
+      }
+      
+      /* DIRECT FALLBACK for placeholders */
+      #nanopub-form-container[data-theme="dark"] input::placeholder,
+      #nanopub-form-container.dark-mode input::placeholder,
+      #nanopub-form-container.dark input::placeholder,
+      #nanopub-form-container[data-theme="dark"] textarea::placeholder,
+      #nanopub-form-container.dark-mode textarea::placeholder,
+      #nanopub-form-container.dark textarea::placeholder {
+        color: #a0a0a0 !important;
+        opacity: 0.7 !important;
+      }
+      
+      /* DIRECT FALLBACK for help text */
+      #nanopub-form-container[data-theme="dark"] .field-help,
+      #nanopub-form-container.dark-mode .field-help,
+      #nanopub-form-container.dark .field-help,
+      #nanopub-form-container[data-theme="dark"] .field-hint,
+      #nanopub-form-container.dark-mode .field-hint,
+      #nanopub-form-container.dark .field-hint,
+      #nanopub-form-container[data-theme="dark"] small,
+      #nanopub-form-container.dark-mode small,
+      #nanopub-form-container.dark small {
+        color: #a0a0a0 !important;
+      }
+
+      /* ===== TYPOGRAPHY ===== */
+      
+      p, span, div, label, legend, h1, h2, h3, h4, h5, h6 {
+        color: var(--text-dark);
+      }
+
+      small, .text-muted, .description {
+        color: var(--text-light);
+      }
+
+      /* ===== OPTIONAL FIELDS ===== */
+      
+      .optional-badge {
+        display: inline-block;
+        margin-left: 0.5rem;
+        padding: 3px 8px;
+        background: #1e3a5f;
+        color: #ffffff;
+        font-size: 0.75em;
+        font-weight: 600;
+        border-radius: 4px;
+        text-transform: uppercase;
+      }
+      
+      /* Dark mode OPTIONAL badges - keep them visible */
+      #nanopub-form-container[data-theme="dark"] .optional-badge,
+      #nanopub-form-container.dark-mode .optional-badge,
+      #nanopub-form-container.dark .optional-badge {
+        background: #1e3a5f !important;
+        color: #ffffff !important;
+      }
+
+      /* ===== FORM HEADER ===== */
+      
+      .form-header {
+        margin-bottom: 2rem;
+      }
+
+      .form-header h2 {
+        color: var(--text-dark);
+        margin-bottom: 0.5rem;
+      }
+
+      .form-description {
+        color: var(--text-light);
+        font-size: 0.95em;
+      }
+    `;
+    
+    container.insertBefore(styleEl, container.firstChild);
+    console.log('[nanopub-view] ✅ Styles injected into form container');
+  }
+
   private static async handleFormSubmit(trigContent: string, preSelectedItem?: Zotero.Item, tabId?: string) {
     try {
       const progressWin = new Zotero.ProgressWindow();
@@ -343,17 +682,14 @@ export class TemplateFormDialog {
 
       progressWin.close();
 
-      // Ensure we have the w3id.org format
       let displayUri = result.uri;
       if (!displayUri.includes('w3id.org')) {
-        // Extract the nanopub ID and convert to w3id.org format
         const idMatch = displayUri.match(/\/np\/([A-Za-z0-9_-]+)/);
         if (idMatch) {
           displayUri = `https://w3id.org/np/${idMatch[1]}`;
         }
       }
 
-      // Show success with Nanodash link
       const nanodashUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(displayUri)}`;
       
       const message = 
@@ -370,7 +706,6 @@ export class TemplateFormDialog {
         );
 
         if (attachAsNote) {
-          // Create a note with the nanopub information
           const noteContent = `
             <h2>Nanopublication</h2>
             <p><strong>URI:</strong> <a href="${displayUri}">${displayUri}</a></p>
@@ -382,14 +717,11 @@ export class TemplateFormDialog {
           note.parentID = preSelectedItem.id;
           note.setNote(noteContent);
           await note.saveTx();
-
-          console.log('[nanopub-view] Attached nanopub as note to item');
         }
       } else {
         Services.prompt.alert(null, 'Success - Nanopublication Published', message);
       }
 
-      // Close the tab
       if (tabId) {
         const win = Zotero.getMainWindow();
         win.Zotero_Tabs.close(tabId);
@@ -406,71 +738,34 @@ export class TemplateFormDialog {
     }
   }
 
-  /**
-   * Detect if Zotero is in dark mode
-   * Uses multiple detection methods since Zotero's dark mode implementation may vary
-   */
   private static isZoteroDarkMode(win: Window): boolean {
     try {
       const doc = win.document;
       const body = doc.body || doc.documentElement;
       
-      console.log('[nanopub-view] === Dark Mode Detection Debug ===');
-      
-      // Check 1: Explicit dark mode indicators
-      const hasExplicitDark = body.classList.contains('dark') || 
-                              body.classList.contains('dark-mode') ||
-                              body.getAttribute('data-theme') === 'dark';
-      console.log('[nanopub-view] Body classes:', Array.from(body.classList));
-      console.log('[nanopub-view] data-theme attribute:', body.getAttribute('data-theme'));
-      console.log('[nanopub-view] Has explicit dark indicator:', hasExplicitDark);
-      
-      if (hasExplicitDark) {
+      if (body.classList.contains('dark') || 
+          body.classList.contains('dark-mode') ||
+          body.getAttribute('data-theme') === 'dark') {
         return true;
       }
       
-      // Check 2: Background color analysis
       const bgColor = win.getComputedStyle(body).backgroundColor;
-      console.log('[nanopub-view] Body background color:', bgColor);
-      
       if (bgColor) {
         const match = bgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
         if (match) {
-          const r = parseInt(match[1]);
-          const g = parseInt(match[2]);
-          const b = parseInt(match[3]);
-          const brightness = (r + g + b) / 3;
-          
-          console.log('[nanopub-view] RGB values:', { r, g, b });
-          console.log('[nanopub-view] Brightness:', brightness);
-          console.log('[nanopub-view] Is dark (< 128)?:', brightness < 128);
-          
+          const brightness = (parseInt(match[1]) + parseInt(match[2]) + parseInt(match[3])) / 3;
           if (brightness < 128) {
             return true;
           }
         }
       }
       
-      // Check 3: System preference
-      const systemPrefersDark = win.matchMedia && win.matchMedia('(prefers-color-scheme: dark)').matches;
-      console.log('[nanopub-view] System prefers dark:', systemPrefersDark);
-      
-      if (systemPrefersDark) {
+      if (win.matchMedia && win.matchMedia('(prefers-color-scheme: dark)').matches) {
         return true;
       }
       
-      // Check 4: Look for dark colors in parent containers
-      let element: any = body;
-      for (let i = 0; i < 5 && element; i++) {
-        const color = win.getComputedStyle(element).backgroundColor;
-        console.log(`[nanopub-view] Checking element ${i} (${element.tagName}):`, color);
-        element = element.parentElement;
-      }
-      
-      console.log('[nanopub-view] === End Dark Mode Detection ===');
       return false;
     } catch (error) {
-      console.error('[nanopub-view] Error detecting dark mode:', error);
       return false;
     }
   }
