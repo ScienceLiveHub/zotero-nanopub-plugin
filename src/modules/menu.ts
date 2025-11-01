@@ -255,11 +255,19 @@ export class MenuManager {
       const oldSeparator = doc.getElementById('nanopub-context-separator');
       if (oldSeparator) oldSeparator.remove();
       
+      const oldCreateMenu = doc.getElementById('nanopub-context-create-menu');
+      if (oldCreateMenu) oldCreateMenu.remove();
+      
       const oldImportItem = doc.getElementById('nanopub-context-import');
       if (oldImportItem) oldImportItem.remove();
 
       const oldSearchItem = doc.getElementById('nanopub-context-search');
       if (oldSearchItem) oldSearchItem.remove();
+
+      // Get selected item to pass to template workflow
+      const pane = Zotero.getActiveZoteroPane();
+      const selectedItems = pane ? pane.getSelectedItems() : [];
+      const selectedItem = selectedItems.length > 0 && selectedItems[0].isRegularItem() ? selectedItems[0] : null;
 
       // Add separator
       const separator = doc.createXULElement ? 
@@ -267,12 +275,53 @@ export class MenuManager {
         doc.createElement('menuseparator');
       separator.id = 'nanopub-context-separator';
 
+      // Add "Create Nanopublication" menu with template submenu
+      const createNanopubMenu = doc.createXULElement ? 
+        doc.createXULElement('menu') : 
+        doc.createElement('menu');
+      createNanopubMenu.id = 'nanopub-context-create-menu';
+      createNanopubMenu.setAttribute('label', '✨ Create Nanopublication');
+      
+      // Disable if no valid item selected
+      if (!selectedItem) {
+        createNanopubMenu.setAttribute('disabled', 'true');
+      }
+
+      // Create submenu popup for templates
+      const createNanopubPopup = doc.createXULElement ? 
+        doc.createXULElement('menupopup') : 
+        doc.createElement('menupopup');
+      createNanopubPopup.id = 'nanopub-context-create-popup';
+
+      // Dynamically add menu items for each template
+      const templates = TemplateBrowser.getPopularTemplates();
+      
+      templates.forEach((template, index) => {
+        const menuItem = doc.createXULElement ? 
+          doc.createXULElement('menuitem') : 
+          doc.createElement('menuitem');
+        
+        menuItem.id = `nanopub-context-template-${index}`;
+        menuItem.setAttribute('label', `${template.icon} ${template.name}`);
+        
+        // Capture template URI and selected item in closure
+        const templateUri = template.uri;
+        const itemToUse = selectedItem;
+        menuItem.addEventListener('command', function() {
+          TemplateFormDialog.showTemplateWorkflow(itemToUse, templateUri);
+        });
+        
+        createNanopubPopup.appendChild(menuItem);
+      });
+
+      createNanopubMenu.appendChild(createNanopubPopup);
+
       // Add "Attach Nanopublication..." menu item
       const importItem = doc.createXULElement ? 
         doc.createXULElement('menuitem') : 
         doc.createElement('menuitem');
       importItem.id = 'nanopub-context-import';
-      importItem.setAttribute('label', '🔎 Attach Nanopublication...');
+      importItem.setAttribute('label', '📎 Attach Nanopublication...');
       
       const self = this;
       importItem.addEventListener('command', function() {
@@ -291,6 +340,7 @@ export class MenuManager {
       });
 
       popup.appendChild(separator);
+      popup.appendChild(createNanopubMenu);
       popup.appendChild(importItem);
       popup.appendChild(searchItem);
       
@@ -568,6 +618,27 @@ export class MenuManager {
       const creationSeparator = doc.getElementById('nanopub-creation-separator');
       if (creationSeparator) {
         creationSeparator.remove();
+      }
+
+      // Remove context menu items
+      const contextSeparator = doc.getElementById('nanopub-context-separator');
+      if (contextSeparator) {
+        contextSeparator.remove();
+      }
+
+      const contextCreateMenu = doc.getElementById('nanopub-context-create-menu');
+      if (contextCreateMenu) {
+        contextCreateMenu.remove();
+      }
+
+      const contextImportItem = doc.getElementById('nanopub-context-import');
+      if (contextImportItem) {
+        contextImportItem.remove();
+      }
+
+      const contextSearchItem = doc.getElementById('nanopub-context-search');
+      if (contextSearchItem) {
+        contextSearchItem.remove();
       }
 
       log("Menu items cleaned up");
