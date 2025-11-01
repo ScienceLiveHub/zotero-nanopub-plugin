@@ -26,7 +26,16 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
+        # Disable cache to ensure fresh install
+        # cache: 'npm'
+    
+    - name: Clear npm cache and node_modules
+      run: |
+        echo "🗑️ Clearing npm cache to ensure fresh dependencies..."
+        npm cache clean --force
+        rm -rf node_modules
+        rm -f package-lock.json
+        echo "✅ Cache cleared"
     
     - name: Get version
       id: version
@@ -46,23 +55,53 @@ jobs:
         echo "Updated package.json to version $VERSION_NUM"
     
     - name: Install dependencies
-      run: npm install
+      run: npm install --no-cache
     
     - name: Build nanopub-view dependency
       run: |
         echo "📦 Building nanopub-view library from GitHub..."
         cd node_modules/@sciencelivehub/nanopub-view
         
-        # Install dependencies
-        npm install
+        echo "📋 Package contents:"
+        ls -la
+        
+        echo "📦 Installing nanopub-view dependencies..."
+        npm install || { echo "❌ npm install failed"; exit 1; }
+        
+        echo "📋 Checking package.json for build scripts..."
+        if grep -q '"build"' package.json; then
+          echo "✅ Found build script in package.json"
+          cat package.json | grep -A 5 '"scripts"'
+          echo ""
+          echo "🔨 Using package's build script..."
+          npm run build || { 
+            echo "⚠️ Package build script failed, trying custom Vite config..."; 
+          }
+        fi
+        
+        # Check if build succeeded
+        if [ -f "dist/nanopub-viewer.esm.js" ]; then
+          echo "✅ Build successful using package script!"
+          ls -lah dist/
+          cd ../../..
+          exit 0
+        fi
+        
+        echo "⚠️ No build script or build failed, using custom Vite config..."
         
         # Create a temporary library-only vite config
+        echo "📝 Creating Vite config..."
         cat > vite.lib.config.js << 'VITE_EOF'
         import { defineConfig } from 'vite';
         import path from 'path';
+        import { fileURLToPath } from 'url';
+        
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
         
         export default defineConfig({
           build: {
+            outDir: 'dist',
+            emptyOutDir: true,
             lib: {
               entry: path.resolve(__dirname, 'src/index.js'),
               name: 'NanopubViewer',
@@ -85,12 +124,84 @@ jobs:
         VITE_EOF
         
         # Build using the library config
-        npx vite build --config vite.lib.config.js
+        echo "🔨 Building with Vite..."
+        npx vite build --config vite.lib.config.js || { 
+          echo "❌ Vite build failed!"; 
+          echo "Checking for errors...";
+          cat package.json | grep "type";
+          exit 1; 
+        }
+        
+        echo "📂 Build output:"
+        ls -lah dist/ || echo "❌ No dist directory created!"
+        
+        echo "🔍 Checking CSS files..."
+        ls -la dist/*.css
+        
+        # Rename style.css to nanopub-viewer.css if it exists
+        if [ -f "dist/style.css" ]; then
+          echo "📝 Found style.css, renaming to nanopub-viewer.css..."
+          mv -v dist/style.css dist/nanopub-viewer.css
+        fi
+        
+        # Rename nanopub-view.css to nanopub-viewer.css if it exists  
+        if [ -f "dist/nanopub-view.css" ]; then
+          echo "📝 Found nanopub-view.css, renaming to nanopub-viewer.css..."
+          mv -v dist/nanopub-view.css dist/nanopub-viewer.css
+        fi
+        
+        echo "📂 Final dist contents after rename:"
+        ls -lah dist/
         
         cd ../../..
         
         echo "✅ nanopub-view built successfully"
         ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
+    
+    - name: Verify nanopub-view build
+      run: |
+        echo "🔍 Verifying nanopub-view build..."
+        
+        echo "📍 Current directory:"
+        pwd
+        
+        echo "📦 nanopub-view package info:"
+        echo "Git commit:"
+        (cd node_modules/@sciencelivehub/nanopub-view && git log -1 --oneline 2>/dev/null) || echo "  (not a git repo)"
+        echo "Package version:"
+        cat node_modules/@sciencelivehub/nanopub-view/package.json | grep '"version"' || echo "  (no version found)"
+        
+        echo "📂 Files in nanopub-view/dist:"
+        ls -la node_modules/@sciencelivehub/nanopub-view/dist/ || echo "❌ Directory not found!"
+        
+        if [ ! -f "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js" ]; then
+          echo "❌ ERROR: nanopub-viewer.esm.js not found!"
+          exit 1
+        fi
+        
+        if [ ! -f "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.css" ]; then
+          echo "❌ ERROR: nanopub-viewer.css not found!"
+          exit 1
+        fi
+        
+        VIEW_JS_SIZE=$(wc -c < "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js")
+        VIEW_CSS_SIZE=$(wc -c < "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.css")
+        
+        echo "📊 Build file sizes:"
+        echo "  - nanopub-viewer.esm.js: $VIEW_JS_SIZE bytes"
+        echo "  - nanopub-viewer.css: $VIEW_CSS_SIZE bytes"
+        
+        if [ "$VIEW_JS_SIZE" -lt 10000 ]; then
+          echo "❌ ERROR: nanopub-viewer.esm.js is too small ($VIEW_JS_SIZE bytes)"
+          exit 1
+        fi
+        
+        if [ "$VIEW_CSS_SIZE" -lt 1000 ]; then
+          echo "❌ ERROR: nanopub-viewer.css is too small ($VIEW_CSS_SIZE bytes)"
+          exit 1
+        fi
+        
+        echo "✅ nanopub-view verification passed!"
     
     - name: Build nanopub-create dependency
       run: |
@@ -147,11 +258,17 @@ jobs:
     
     - name: Verify build
       run: |
-        echo "Build directory contents:"
+        echo "✅ Build completed successfully!"
         ls -lah build/
         echo ""
-        echo "XPI contents:"
-        unzip -l build/nanopub.xpi
+        echo "📦 XPI size:"
+        du -h build/nanopub.xpi
+        echo ""
+        echo "📋 XPI contents (checking for nanopub-view files):"
+        unzip -l build/nanopub.xpi | grep -E "(nanopub-viewer|nanopub-creator)" || echo "⚠️ Warning: No nanopub-view/create files found in XPI!"
+        echo ""
+        echo "🔍 Checking if styles directory exists in XPI:"
+        unzip -l build/nanopub.xpi | grep "content/styles/" || echo "⚠️ Warning: No styles directory found!"
     
     - name: Rename XPI with version
       run: |
