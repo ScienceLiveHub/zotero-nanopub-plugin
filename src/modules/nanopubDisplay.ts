@@ -12,8 +12,11 @@ export class NanopubDisplay {
 
   /**
    * Display a nanopublication from URI in a Zotero note attached to an item
+   * @param item - The Zotero item to attach the note to
+   * @param nanopubUri - The URI of the nanopublication
+   * @param isCreated - If true, tag as 'nanopub:created', otherwise 'nanopub:imported'
    */
-  async displayFromUri(item: any, nanopubUri: string): Promise<void> {
+  async displayFromUri(item: any, nanopubUri: string, isCreated: boolean = false): Promise<void> {
     try {
       log("Displaying nanopub from URI: " + nanopubUri);
 
@@ -78,7 +81,7 @@ export class NanopubDisplay {
 
       // Add tags
       note.addTag('nanopublication');
-      note.addTag('nanopub:imported');
+      note.addTag(isCreated ? 'nanopub:created' : 'nanopub:imported');
       
       // Add type-based tag
       const typeTag = nanopubLabel.toLowerCase().replace(/[^\w]+/g, '-');

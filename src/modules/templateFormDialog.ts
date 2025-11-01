@@ -706,17 +706,19 @@ export class TemplateFormDialog {
         );
 
         if (attachAsNote) {
-          const noteContent = `
-            <h2>Nanopublication</h2>
-            <p><strong>URI:</strong> <a href="${displayUri}">${displayUri}</a></p>
-            <p><strong>View:</strong> <a href="${nanodashUrl}">Open in Nanodash</a></p>
-            <p><em>Created: ${new Date().toLocaleString()}</em></p>
-          `;
-
-          const note = new Zotero.Item('note');
-          note.parentID = preSelectedItem.id;
-          note.setNote(noteContent);
-          await note.saveTx();
+          // Use NanopubDisplay to create a rich formatted note
+          const { NanopubDisplay } = await import("./nanopubDisplay");
+          const display = new NanopubDisplay();
+          
+          // Use displayFromUri to create the same rich format as "Attach nanopublication"
+          // Pass isCreated=true to tag it appropriately
+          await display.displayFromUri(preSelectedItem, displayUri, true);
+          
+          Services.prompt.alert(
+            null,
+            'Success',
+            'Nanopublication attached successfully! Check the notes attached to your selected item.'
+          );
         }
       } else {
         Services.prompt.alert(null, 'Success - Nanopublication Published', message);
