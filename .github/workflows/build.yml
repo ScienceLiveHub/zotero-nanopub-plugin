@@ -37,14 +37,45 @@ jobs:
           echo "📦 Building nanopub-view library from GitHub..."
           cd node_modules/@sciencelivehub/nanopub-view
           
-          npm install
+          echo "📋 Package contents:"
+          ls -la
           
+          echo "📦 Installing nanopub-view dependencies..."
+          npm install || { echo "❌ npm install failed"; exit 1; }
+          
+          echo "📋 Checking package.json for build scripts..."
+          if grep -q '"build"' package.json; then
+            echo "✅ Found build script in package.json"
+            cat package.json | grep -A 5 '"scripts"'
+            echo ""
+            echo "🔨 Using package's build script..."
+            npm run build || { 
+              echo "⚠️ Package build script failed, trying custom Vite config..."; 
+            }
+          fi
+          
+          # Check if build succeeded
+          if [ -f "dist/nanopub-viewer.esm.js" ]; then
+            echo "✅ Build successful using package script!"
+            ls -lah dist/
+            cd ../../..
+            exit 0
+          fi
+          
+          echo "⚠️ No build script or build failed, using custom Vite config..."
+          
+          echo "📝 Creating Vite config..."
           cat > vite.lib.config.js << 'VITE_EOF'
           import { defineConfig } from 'vite';
           import path from 'path';
+          import { fileURLToPath } from 'url';
+          
+          const __dirname = path.dirname(fileURLToPath(import.meta.url));
           
           export default defineConfig({
             build: {
+              outDir: 'dist',
+              emptyOutDir: true,
               lib: {
                 entry: path.resolve(__dirname, 'src/index.js'),
                 name: 'NanopubViewer',
@@ -66,7 +97,25 @@ jobs:
           });
           VITE_EOF
           
-          npx vite build --config vite.lib.config.js
+          echo "🔨 Building with Vite..."
+          npx vite build --config vite.lib.config.js || { 
+            echo "❌ Vite build failed!"; 
+            echo "Checking for errors...";
+            cat package.json | grep "type";
+            exit 1; 
+          }
+          
+          echo "📂 Build output:"
+          ls -lah dist/ || echo "❌ No dist directory created!"
+          
+          # Rename style.css to nanopub-viewer.css if it exists
+          if [ -f "dist/style.css" ] && [ ! -f "dist/nanopub-viewer.css" ]; then
+            echo "📝 Renaming style.css to nanopub-viewer.css..."
+            mv dist/style.css dist/nanopub-viewer.css
+          fi
+          
+          echo "📂 Final dist contents:"
+          ls -lah dist/
           
           cd ../../..
           
