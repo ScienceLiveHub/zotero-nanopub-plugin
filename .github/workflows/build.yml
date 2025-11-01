@@ -139,18 +139,12 @@ jobs:
           echo "📍 Current directory:"
           pwd
           
-          # Log version info
+          # Log version info (don't cd, just use the path)
           echo "📦 nanopub-view package info:"
-          cd node_modules/@sciencelivehub/nanopub-view
           echo "Git commit:"
-          git log -1 --oneline 2>/dev/null || echo "  (not a git repo)"
+          (cd node_modules/@sciencelivehub/nanopub-view && git log -1 --oneline 2>/dev/null) || echo "  (not a git repo)"
           echo "Package version:"
-          cat package.json | grep '"version"' || echo "  (no version found)"
-          cd ../..
-          
-          # Show where we are after cd
-          echo "📍 After cd ../.. we are at:"
-          pwd
+          cat node_modules/@sciencelivehub/nanopub-view/package.json | grep '"version"' || echo "  (no version found)"
           
           # List what files actually exist
           echo "📂 Files in nanopub-view/dist:"
