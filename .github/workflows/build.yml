@@ -18,10 +18,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # Disable cache to ensure fresh install
+          # cache: 'npm'
+      
+      - name: Clear npm cache and node_modules
+        run: |
+          echo "🗑️ Clearing npm cache to ensure fresh dependencies..."
+          npm cache clean --force
+          rm -rf node_modules
+          rm -f package-lock.json
+          echo "✅ Cache cleared"
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-cache
       
       - name: Build nanopub-view dependency
         run: |
@@ -63,6 +72,68 @@ jobs:
           
           echo "✅ nanopub-view built successfully"
           ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
+          
+      - name: Verify nanopub-view build
+        run: |
+          echo "🔍 Verifying nanopub-view build..."
+          
+          # Log version info
+          echo "📦 nanopub-view package info:"
+          cd node_modules/@sciencelivehub/nanopub-view
+          echo "Git commit:"
+          git log -1 --oneline 2>/dev/null || echo "  (not a git repo)"
+          echo "Package version:"
+          cat package.json | grep '"version"' || echo "  (no version found)"
+          cd ../..
+          
+          # Check if critical files exist
+          if [ ! -f "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js" ]; then
+            echo "❌ ERROR: nanopub-viewer.esm.js not found!"
+            exit 1
+          fi
+          
+          if [ ! -f "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.css" ]; then
+            echo "❌ ERROR: nanopub-viewer.css not found!"
+            exit 1
+          fi
+          
+          # Check file sizes
+          VIEW_JS_SIZE=$(wc -c < "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.esm.js")
+          VIEW_CSS_SIZE=$(wc -c < "node_modules/@sciencelivehub/nanopub-view/dist/nanopub-viewer.css")
+          
+          echo "📊 Build file sizes:"
+          echo "  - nanopub-viewer.esm.js: $VIEW_JS_SIZE bytes"
+          echo "  - nanopub-viewer.css: $VIEW_CSS_SIZE bytes"
+          
+          # Verify files are not too small
+          if [ "$VIEW_JS_SIZE" -lt 10000 ]; then
+            echo "❌ ERROR: nanopub-viewer.esm.js is too small ($VIEW_JS_SIZE bytes)"
+            exit 1
+          fi
+          
+          if [ "$VIEW_CSS_SIZE" -lt 1000 ]; then
+            echo "❌ ERROR: nanopub-viewer.css is too small ($VIEW_CSS_SIZE bytes)"
+            exit 1
+          fi
+          
+          echo "✅ nanopub-view verification passed!"
+          
+      - name: Test nanopub-view import
+        run: |
+          echo "🧪 Testing if nanopub-view can be imported..."
+          node -e "
+            try {
+              const { NanopubViewer } = require('@sciencelivehub/nanopub-view');
+              console.log('✅ NanopubViewer imported successfully');
+              console.log('   Constructor type:', typeof NanopubViewer);
+              console.log('   Has renderFromUri:', typeof NanopubViewer.prototype.renderFromUri);
+              console.log('   Has render:', typeof NanopubViewer.prototype.render);
+            } catch (err) {
+              console.error('❌ Failed to import NanopubViewer:', err.message);
+              console.error(err.stack);
+              process.exit(1);
+            }
+          "
       
       - name: Build nanopub-create dependency
         run: |
@@ -122,8 +193,17 @@ jobs:
           echo "✅ Build completed successfully!"
           ls -lah build/
           echo ""
-          echo "XPI size:"
+          echo "📦 XPI size:"
           du -h build/nanopub.xpi
+          echo ""
+          echo "📋 XPI contents (checking for nanopub-view files):"
+          unzip -l build/nanopub.xpi | grep -E "(nanopub-viewer|nanopub-creator)" || echo "⚠️ Warning: No nanopub-view/create files found in XPI!"
+          echo ""
+          echo "🔍 Checking if styles directory exists in XPI:"
+          unzip -l build/nanopub.xpi | grep "content/styles/" || echo "⚠️ Warning: No styles directory found!"
+          echo ""
+          echo "📄 Full XPI structure:"
+          unzip -l build/nanopub.xpi | head -50
           
       - name: Upload XPI artifact
         uses: actions/upload-artifact@v4
