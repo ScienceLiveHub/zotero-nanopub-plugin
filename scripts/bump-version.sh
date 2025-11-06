@@ -20,33 +20,34 @@ fi
 
 echo "Bumping version to $NEW_VERSION..."
 
-# Update manifest.json
-sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" manifest.json
-rm manifest.json.bak
+# Use npm to update the version (this handles both package.json and package-lock.json correctly)
+npm version $NEW_VERSION --no-git-tag-version
 
-# Update package.json if it exists
-if [ -f package.json ]; then
-    sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$NEW_VERSION\"/" package.json
-    rm package.json.bak
-fi
-
-echo "Updated version to $NEW_VERSION"
+echo ""
+echo "✅ Updated version to $NEW_VERSION"
+echo ""
+echo "Note: manifest.json will be automatically generated during build from package.json"
 
 # Show changes
+echo ""
 echo "Changes made:"
-git diff manifest.json
+git diff package.json package-lock.json | head -50
 
 # Commit changes
+echo ""
 read -p "Commit changes and create tag? (y/N) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    git add manifest.json
-    [ -f package.json ] && git add package.json
+    git add package.json package-lock.json
     git commit -m "Bump version to $NEW_VERSION"
     git tag "v$NEW_VERSION"
     
-    echo "Created commit and tag v$NEW_VERSION"
-    echo "To trigger release, run: git push origin main --tags"
+    echo ""
+    echo "✅ Created commit and tag v$NEW_VERSION"
+    echo ""
+    echo "To trigger release, run:"
+    echo "  git push origin main --tags"
 else
+    echo ""
     echo "Changes not committed. Run 'git checkout .' to revert."
 fi

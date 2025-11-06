@@ -1,6 +1,6 @@
 {
   "name": "zotero-plugin-nanopub",
-  "version": "2.0.0",
+  "version": "0.1.3",
   "description": "Create nanopublications from Zotero items and link them to your bibliography",
   "author": "ScienceLiveHub <contact@vitenhub.no>",
   "license": "MIT",
