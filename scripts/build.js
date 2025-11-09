@@ -103,7 +103,7 @@ async function build() {
             };
           }
           
-          // Polyfill fetch if not available
+          // Polyfill fetch if not available 
           if (typeof fetch === 'undefined') {
             globalThis.fetch = async function(url, options) {
               // Use Zotero's HTTP request
@@ -112,6 +112,9 @@ async function build() {
                   var xhr = new XMLHttpRequest();
                   xhr.open(options && options.method || 'GET', url);
                   
+                  // Add Accept header for RDF formats
+                  xhr.setRequestHeader('Accept', 'application/trig, text/turtle, application/ld+json, application/json');
+                  
                   if (options && options.headers) {
                     for (var key in options.headers) {
                       xhr.setRequestHeader(key, options.headers[key]);
@@ -119,21 +122,76 @@ async function build() {
                   }
                   
                   xhr.onload = function() {
+                    var isSuccess = xhr.status >= 200 && xhr.status < 300;
+                    
+                    // Log the response for debugging
+                    if (typeof console !== 'undefined') {
+                      console.log('[fetch] ' + url + ' -> ' + xhr.status);
+                      if (!isSuccess || xhr.responseText.length < 500) {
+                        console.log('[fetch] Response preview:', xhr.responseText.substring(0, 200));
+                      }
+                    }
+                    
                     resolve({
-                      ok: xhr.status >= 200 && xhr.status < 300,
+                      ok: isSuccess,
                       status: xhr.status,
                       statusText: xhr.statusText,
-                      text: function() { return Promise.resolve(xhr.responseText); },
-                      json: function() { return Promise.resolve(JSON.parse(xhr.responseText)); }
+                      headers: {
+                        get: function(name) {
+                          return xhr.getResponseHeader(name);
+                        }
+                      },
+                      text: function() { 
+                        return Promise.resolve(xhr.responseText); 
+                      },
+                      json: function() { 
+                        return new Promise(function(resolveJson, rejectJson) {
+                          try {
+                            // Validate JSON before parsing
+                            var text = xhr.responseText.trim();
+                            if (!text) {
+                              console.error('[fetch] Empty response body from:', url);
+                              rejectJson(new Error('Empty response body'));
+                              return;
+                            }
+                            
+                            // Check if it starts with JSON markers
+                            if (!text.startsWith('{') && !text.startsWith('[')) {
+                              console.error('[fetch] Response is not JSON from:', url);
+                              console.error('[fetch] Response starts with:', text.substring(0, 100));
+                              rejectJson(new Error('Response is not JSON: ' + text.substring(0, 50)));
+                              return;
+                            }
+                            
+                            var parsed = JSON.parse(text);
+                            resolveJson(parsed);
+                          } catch (e) {
+                            console.error('[fetch] JSON parse error from:', url);
+                            console.error('[fetch] Error:', e.message);
+                            console.error('[fetch] Response text:', xhr.responseText.substring(0, 200));
+                            rejectJson(new Error('JSON parse failed: ' + e.message));
+                          }
+                        });
+                      }
                     });
                   };
                   
                   xhr.onerror = function() {
+                    console.error('[fetch] Network error for:', url);
                     reject(new Error('Network error'));
                   };
                   
+                  xhr.ontimeout = function() {
+                    console.error('[fetch] Timeout for:', url);
+                    reject(new Error('Request timeout'));
+                  };
+                  
+                  // Set timeout (30 seconds)
+                  xhr.timeout = 30000;
+                  
                   xhr.send(options && options.body);
                 } catch (e) {
+                  console.error('[fetch] Exception:', e);
                   reject(e);
                 }
               });
