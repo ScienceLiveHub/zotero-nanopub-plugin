@@ -37,6 +37,9 @@ jobs:
         rm -f package-lock.json
         echo "✅ Cache cleared"
     
+    - name: Install dependencies
+      run: npm install --no-cache
+    
     - name: Get version
       id: version
       run: |
@@ -47,20 +50,6 @@ jobs:
         fi
         VERSION_NUM=$(echo "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref }}" | sed 's/refs\/tags\///' | sed 's/^v//')
         echo "VERSION_NUM=$VERSION_NUM" >> $GITHUB_OUTPUT
-
-    - name: Update package.json version
-      run: |
-        VERSION_NUM="${{ steps.version.outputs.VERSION_NUM }}"
-        CURRENT_VERSION=$(node -p "require('./package.json').version")
-        if [ "$CURRENT_VERSION" = "$VERSION_NUM" ]; then
-          echo "package.json already at version $VERSION_NUM, skipping npm version"
-        else
-          npm version $VERSION_NUM --no-git-tag-version
-          echo "Updated package.json to version $VERSION_NUM"
-        fi
-    
-    - name: Install dependencies
-      run: npm install --no-cache
     
     - name: Build nanopub-view dependency
       run: |
