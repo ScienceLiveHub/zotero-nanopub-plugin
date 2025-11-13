@@ -12,14 +12,14 @@ Transform your Zotero library into a semantic web publishing platform. Create, s
 
 ## ✨ Features
 
-- ** All In-Zotero** - Complete workflow in Zotero tabs, no external websites
-- ** Smart Forms** - Auto-generated forms from nanopub templates
-- ** ORCID Signing** - Cryptographic signing with your ORCID (WASM-powered)
-- ** Multiple Templates** - CiTO, AIDA, Rosetta, and custom templates
-- ** Discovery** - Search for related nanopublications
-- ** Import** - Add nanopubs from the network to your library
-- ** Rich Notes** - Beautiful, interactive display of nanopubs
-- ** Dark Mode** - Seamless theme integration
+- **All In-Zotero** - Complete workflow in Zotero tabs, no external websites
+- **Smart Forms** - Auto-generated forms from nanopub templates
+- **ORCID Signing** - Cryptographic signing with your ORCID (WASM-powered)
+- **Multiple Templates** - CiTO, AIDA, Rosetta, and custom templates
+- **Discovery** - Search for related nanopublications
+- **Import** - Add nanopubs from the network to your library
+- **Rich Notes** - Beautiful, interactive display of nanopubs
+- **Dark Mode** - Seamless theme integration
 
 ---
 
