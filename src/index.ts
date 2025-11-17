@@ -4,11 +4,50 @@ import { NanopubDisplay } from "./modules/nanopubDisplay";
 import { NanopubSearch } from "./modules/nanopubSearch";
 import { MenuManager } from "./modules/menu";
 import { ZoteroNanopubCreator } from './modules/nanopubCreator';
+import { registerPrefsWindow } from './modules/preferenceWindow';
 
 // Declare global types
 declare global {
   var Zotero: any;
   var Services: any;
+}
+
+// Helper function for saving profile from preferences
+// Must be defined before onStartup uses it
+async function setupProfileFromPrefs() {
+  try {
+    const name = Zotero.Prefs.get('extensions.nanopub.profile.name', true);
+    const orcid = Zotero.Prefs.get('extensions.nanopub.profile.orcid', true);
+    
+    if (!name || !orcid) {
+      Services.prompt.alert(
+        null, 
+        'Incomplete Profile', 
+        'Please fill in both Name and ORCID fields.'
+      );
+      return;
+    }
+    
+    // Format ORCID
+    const formattedOrcid = orcid.startsWith('https://orcid.org/') 
+      ? orcid 
+      : `https://orcid.org/${orcid}`;
+    
+    // Setup profile using the creator
+    await Zotero.Nanopub.creator.setupProfile(name, formattedOrcid);
+    
+    Services.prompt.alert(
+      null, 
+      'Profile Saved', 
+      `Profile saved successfully!\n\nName: ${name}\nORCID: ${formattedOrcid}`
+    );
+  } catch (err: any) {
+    Services.prompt.alert(
+      null, 
+      'Error', 
+      `Failed to save profile:\n${err.message}`
+    );
+  }
 }
 
 // Initialize plugin namespace
@@ -47,6 +86,10 @@ const initPlugin = () => {
         log("Zotero UI is ready");
       }
 
+      // Register preferences window
+      registerPrefsWindow();
+      log("Preferences window registered");
+
       // Initialize display module
       displayModule = new NanopubDisplay();
       Zotero.Nanopub.displayModule = displayModule;
@@ -63,11 +106,16 @@ const initPlugin = () => {
       Zotero.Nanopub.menuManager = menuManager;
       log("Menu manager initialized successfully");
       
-      // Initialize nanopub creator (NEW)
+      // Initialize nanopub creator
       try {
         nanopubCreator = new ZoteroNanopubCreator();
         await nanopubCreator.init();
         Zotero.Nanopub.creator = nanopubCreator;
+        
+        // Add helper functions for preferences
+        Zotero.Nanopub.setupProfileFromPrefs = setupProfileFromPrefs;
+        Zotero.Nanopub.showProfileInfo = () => nanopubCreator?.showProfileInfo();
+        
         log("✅ Nanopub creator initialized successfully");
       } catch (err: any) {
         error("⚠️ Failed to initialize nanopub creator:", err);

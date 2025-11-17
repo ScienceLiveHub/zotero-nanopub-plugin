@@ -1,6 +1,7 @@
-// addon/bootstrap.js - Minimal bootstrap that loads TypeScript
+// addon/bootstrap.js - Bootstrap with chrome protocol registration
 var Zotero;
 var Services;
+var chromeHandle;
 
 function install(data, reason) {}
 function uninstall(data, reason) {}
@@ -23,6 +24,15 @@ async function startup({ id, version, resourceURI, rootURI = resourceURI.spec } 
   
   await Zotero.initializationPromise;
   await Zotero.uiReadyPromise;
+  
+  // Register chrome protocol - CRITICAL for preferences and resources
+  var aomStartup = Components.classes[
+    "@mozilla.org/addons/addon-manager-startup;1"
+  ].getService(Components.interfaces.amIAddonManagerStartup);
+  var manifestURI = Services.io.newURI(rootURI + "manifest.json");
+  chromeHandle = aomStartup.registerChrome(manifestURI, [
+    ["content", "nanopub", rootURI + "chrome/content/"],
+  ]);
   
   // Now load the compiled TypeScript bundle
   try {
@@ -50,6 +60,12 @@ function shutdown(data, reason) {
       if (typeof Services !== 'undefined' && Services.console) {
         Services.console.logStringMessage('Nanopub Plugin shutdown error: ' + e.message);
       }
+    }
+    
+    // Cleanup chrome registration
+    if (chromeHandle) {
+      chromeHandle.destruct();
+      chromeHandle = null;
     }
   }
 }

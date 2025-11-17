@@ -1,5 +1,3 @@
-import { config } from "../../package.json";
-
 // src/modules/preferenceWindow.ts
 export function registerPrefsWindow() {
   console.log('[Nanopub] Registering preferences window...');
