@@ -189,7 +189,15 @@ async function build() {
                   // Set timeout (30 seconds)
                   xhr.timeout = 30000;
                   
-                  xhr.send(options && options.body);
+                  // Convert string body to Blob to preserve exact UTF-8 bytes
+                  // XMLHttpRequest can transform string encoding, which breaks nanopub signatures
+                  var bodyToSend = options && options.body;
+                  if (bodyToSend && typeof bodyToSend === 'string') {
+                    // Use Blob with explicit UTF-8 charset to prevent encoding issues
+                    bodyToSend = new Blob([bodyToSend], { type: 'application/trig; charset=utf-8' });
+                  }
+                  
+                  xhr.send(bodyToSend);
                 } catch (e) {
                   console.error('[fetch] Exception:', e);
                   reject(e);

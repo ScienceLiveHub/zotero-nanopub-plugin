@@ -288,4 +288,28 @@ sub:pubinfo {
   getFormData(): Record<string, any> {
     return this.creator.formData || {};
   }
+
+
+showProfileInfo(): void {
+  if (!this.hasProfile()) {
+    Services.prompt.alert(
+      null,
+      'No Profile',
+      'No nanopub profile has been set up yet.\n\n' +
+      'Please configure your profile in Zotero → Settings → Science Live'
+    );
+    return;
+  }
+
+  const profile = this.getProfile();
+  
+  Services.prompt.alert(
+    null,
+    'Nanopub Profile',
+    `Name: ${profile.name}\nORCID: ${profile.orcid}\n\n` +
+    'Keys are stored securely in Zotero.'
+  );
+}
+
+
 }

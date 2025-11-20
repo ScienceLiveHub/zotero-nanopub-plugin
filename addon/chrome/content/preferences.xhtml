@@ -1,0 +1,52 @@
+<linkset>
+  <html:link rel="localization" href="nanopub-preferences.ftl" xmlns:html="http://www.w3.org/1999/xhtml"/>
+</linkset>
+
+<groupbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:html="http://www.w3.org/1999/xhtml">
+  <label><html:h2>Nanopub Profile</html:h2></label>
+  
+  <hbox align="center">
+    <html:label for="nanopub-profile-name" style="width: 80px;">Your Name:</html:label>
+    <html:input type="text"
+                id="nanopub-profile-name"
+                preference="extensions.nanopub.profile.name"
+                placeholder="Jane Smith"
+                style="flex: 1; margin-left: 10px;"></html:input>
+  </hbox>
+  
+  <hbox align="center" style="margin-top: 10px;">
+    <html:label for="nanopub-profile-orcid" style="width: 80px;">Your ORCID:</html:label>
+    <html:input type="text"
+                id="nanopub-profile-orcid"
+                preference="extensions.nanopub.profile.orcid"
+                placeholder="0000-0002-1234-5678 or https://orcid.org/0000-0002-1234-5678"
+                style="flex: 1; margin-left: 10px;"></html:input>
+  </hbox>
+  
+  <description style="margin-top: 8px; color: gray; font-size: 0.9em;">
+    You can enter just the ORCID number (0000-0002-1234-5678) or the full URL. Both formats work.
+  </description>
+  
+  <hbox style="margin-top: 15px;">
+    <button label="Save Profile"
+            onclick="Zotero.Nanopub.setupProfileFromPrefs()"></button>
+    <button label="View Profile"
+            onclick="Zotero.Nanopub.showProfileInfo()"></button>
+  </hbox>
+  
+  <description style="margin-top: 10px; color: gray; font-size: 0.9em;">
+    Your profile is used to sign nanopublications. Keys are stored securely in Zotero.
+  </description>
+</groupbox>
+
+<groupbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:html="http://www.w3.org/1999/xhtml" 
+          style="margin-top: 20px;">
+  <label><html:h2>About</html:h2></label>
+  <label class="zotero-text-link keyboard-clickable"
+         is="zotero-text-link"
+         role="link"
+         href="https://sciencelive4all.org/zotero-nanopub-plugin/"
+         value="Science Live - Zotero Nanopub Plugin"></label>
+</groupbox>
