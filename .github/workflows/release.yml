@@ -196,56 +196,17 @@ jobs:
         fi
         
         echo "✅ nanopub-view verification passed!"
-    
+
     - name: Build nanopub-create dependency
-      run: |
-        echo "📦 Building nanopub-create library from GitHub..."
-        cd node_modules/@sciencelivehub/nanopub-create
-        
-        # Install dependencies
-        npm install
-        
-        # Create a temporary library-only vite config
-        cat > vite.lib.config.js << 'VITE_EOF'
-        import { defineConfig } from 'vite';
-        import path from 'path';
-        import wasm from 'vite-plugin-wasm';
-        import topLevelAwait from 'vite-plugin-top-level-await';
-        
-        export default defineConfig({
-          plugins: [
-            wasm(),
-            topLevelAwait()
-          ],
-          build: {
-            lib: {
-              entry: path.resolve(__dirname, 'src/index.js'),
-              name: 'NanopubCreator',
-              formats: ['es', 'umd'],
-              fileName: (format) => {
-                if (format === 'es') return 'nanopub-creator.esm.js';
-                if (format === 'umd') return 'nanopub-creator.js';
-              }
-            },
-            rollupOptions: {
-              output: {
-                assetFileNames: (assetInfo) => {
-                  if (assetInfo.name === 'style.css') return 'nanopub-creator.css';
-                  return assetInfo.name;
-                }
-              }
-            }
-          }
-        });
-        VITE_EOF
-        
-        # Build using the library config
-        npx vite build --config vite.lib.config.js
-        
-        cd ../../..
-        
-        echo "✅ nanopub-create built successfully"
-        ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
+        run: |
+          echo "📦 Verifying  anopub-create library from GitHub..."
+          if [ ! -f "node_modules/@sciencelivehub/nanopub-create/dist/nanopub-creator.esm.js" ]; then
+            echo "❌ ERROR: nanopub-creator.esm.js not found!"
+            exit 1
+          fi
+    
+          echo "✅ nanopub-create dist/ folder exists"
+          ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
     
     - name: Build plugin
       run: npm run build

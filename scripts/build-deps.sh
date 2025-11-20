@@ -46,18 +46,30 @@ echo "✅ nanopub-view built"
 ls -lah node_modules/@sciencelivehub/nanopub-view/dist/
 
 # Build nanopub-create
-echo "📦 Building nanopub-create..."
+echo "📦 Building nanopub-create with WASM inlining..."
 cd node_modules/@sciencelivehub/nanopub-create
 
 # Install its dependencies
 npm install
 
-# Build it (it already has vite.lib.config.js)
+echo "🔍 Checking for WASM files before build..."
+find node_modules/@nanopub/sign -name "*.wasm" 2>/dev/null || echo "No WASM files found"
+
+# Build it (now with WASM inlining)
+echo "🔨 Building with vite.lib.config.js..."
 npx vite build --config vite.lib.config.js
 
-cd ../../..
-
 echo "✅ nanopub-create built"
-ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
+echo "📊 Build output:"
+ls -lah dist/
+
+echo "📏 Bundle sizes:"
+du -h dist/nanopub-creator.esm.js
+du -h dist/nanopub-creator.js
+
+echo "🔍 Checking for WASM files in output (should be none)..."
+find dist/ -name "*.wasm" 2>/dev/null || echo "✅ No separate WASM files (good - it's inlined!)"
+
+cd ../../..
 
 echo "✅ All dependencies built successfully"

@@ -1,6 +1,5 @@
 # Build output
 build/
-dist/
 *.xpi
 
 # Dependencies
