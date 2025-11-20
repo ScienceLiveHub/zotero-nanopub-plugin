@@ -198,15 +198,15 @@ jobs:
         echo "✅ nanopub-view verification passed!"
 
     - name: Build nanopub-create dependency
-        run: |
-          echo "📦 Verifying  anopub-create library from GitHub..."
-          if [ ! -f "node_modules/@sciencelivehub/nanopub-create/dist/nanopub-creator.esm.js" ]; then
-            echo "❌ ERROR: nanopub-creator.esm.js not found!"
-            exit 1
-          fi
+      run: |   
+        echo "📦 Verifying  anopub-create library from GitHub..."
+        if [ ! -f "node_modules/@sciencelivehub/nanopub-create/dist/nanopub-creator.esm.js" ]; then
+          echo "❌ ERROR: nanopub-creator.esm.js not found!"
+          exit 1
+        fi
     
-          echo "✅ nanopub-create dist/ folder exists"
-          ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
+        echo "✅ nanopub-create dist/ folder exists"
+        ls -lah node_modules/@sciencelivehub/nanopub-create/dist/
     
     - name: Build plugin
       run: npm run build
