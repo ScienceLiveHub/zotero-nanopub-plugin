@@ -162,28 +162,6 @@ export class MenuManager {
         doc.createElement('menuseparator');
       creationSeparator.id = 'nanopub-creation-separator';
 
-      // Setup Profile menu item
-      const setupProfileItem = doc.createXULElement ? 
-        doc.createXULElement('menuitem') : 
-        doc.createElement('menuitem');
-      setupProfileItem.id = 'nanopub-setup-profile';
-      setupProfileItem.setAttribute('label', 'Setup Nanopub Profile');
-      
-      setupProfileItem.addEventListener('command', function() {
-        NanopubCreationDialog.showProfileSetupDialog();
-      });
-
-      // Show Profile menu item
-      const showProfileItem = doc.createXULElement ? 
-        doc.createXULElement('menuitem') : 
-        doc.createElement('menuitem');
-      showProfileItem.id = 'nanopub-show-profile';
-      showProfileItem.setAttribute('label', 'Show Nanopub Profile');
-      
-      showProfileItem.addEventListener('command', function() {
-        NanopubCreationDialog.showProfileInfo();
-      });
-
       // Create main "Create Nanopublication" menu with submenu
       const createNanopubMenu = doc.createXULElement ? 
         doc.createXULElement('menu') : 
@@ -211,7 +189,10 @@ export class MenuManager {
         // Capture template URI in closure
         const templateUri = template.uri;
         menuItem.addEventListener('command', function() {
-          TemplateFormDialog.showTemplateWorkflow(null, templateUri);
+          const activePane = Zotero.getActiveZoteroPane();
+          const selectedItems = activePane ? activePane.getSelectedItems() : [];
+          const selectedItem = selectedItems.length > 0 && selectedItems[0].isRegularItem() ? selectedItems[0] : null;
+          TemplateFormDialog.showTemplateWorkflow(selectedItem, templateUri);
         });
         
         createNanopubPopup.appendChild(menuItem);
@@ -221,8 +202,6 @@ export class MenuManager {
 
       // Add all items to file menu
       fileMenu.appendChild(creationSeparator);
-      fileMenu.appendChild(setupProfileItem);
-      fileMenu.appendChild(showProfileItem);
       fileMenu.appendChild(createNanopubMenu);
       
       log("Nanopub creation menu items added successfully");
@@ -597,17 +576,6 @@ export class MenuManager {
       const separator = doc.getElementById('nanopub-separator');
       if (separator) {
         separator.remove();
-      }
-
-      // Remove nanopub creation menu items
-      const setupProfileItem = doc.getElementById('nanopub-setup-profile');
-      if (setupProfileItem) {
-        setupProfileItem.remove();
-      }
-
-      const showProfileItem = doc.getElementById('nanopub-show-profile');
-      if (showProfileItem) {
-        showProfileItem.remove();
       }
 
       const createNanopubMenu = doc.getElementById('nanopub-create-menu');
