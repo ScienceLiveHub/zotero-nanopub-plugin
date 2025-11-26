@@ -42,66 +42,66 @@ export class TemplateFormDialog {
   }
 
   /**
- * Pre-fill form fields with metadata from the selected Zotero item
- */
-private static prefillFormFromItem(formContainer: HTMLElement, item: Zotero.Item) {
-  try {
-    // Extract metadata from Zotero item
-    const doi = item.getField('DOI');
-    const title = item.getField('title');
-    const url = item.getField('url');
-    const abstractText = item.getField('abstractNote');
-    
-    // Get authors
-    const creators = item.getCreators();
-    const authors = creators
-      .filter((c: any) => c.creatorType === 'author')
-      .map((c: any) => c.firstName ? `${c.firstName} ${c.lastName}` : c.lastName)
-      .join(', ');
-    
-    // Get year
-    const date = item.getField('date');
-    const year = date ? new Date(date).getFullYear().toString() : '';
+   * Pre-fill form fields with metadata from the selected Zotero item
+   */
+  private static prefillFormFromItem(formContainer: HTMLElement, item: Zotero.Item) {
+    try {
+      // Extract metadata from Zotero item
+      const doi = item.getField('DOI');
+      const title = item.getField('title');
+      const url = item.getField('url');
+      const abstractText = item.getField('abstractNote');
+      
+      // Get authors
+      const creators = item.getCreators();
+      const authors = creators
+        .filter((c: any) => c.creatorType === 'author')
+        .map((c: any) => c.firstName ? `${c.firstName} ${c.lastName}` : c.lastName)
+        .join(', ');
+      
+      // Get year
+      const date = item.getField('date');
+      const year = date ? new Date(date).getFullYear().toString() : '';
 
-    console.log('[nanopub-view] Pre-filling form with:', { doi, title, authors, year });
+      console.log('[nanopub-view] Pre-filling form with:', { doi, title, authors, year });
 
-    // Small delay to ensure form is fully rendered
-    setTimeout(() => {
-      // Find and fill DOI fields
-      if (doi) {
-        const doiValue = doi.startsWith('http') ? doi : `https://doi.org/${doi}`;
-        this.fillFieldsByPattern(formContainer, ['doi', 'article', 'paper', 'publication', 'work'], doiValue);
-      }
+      // Small delay to ensure form is fully rendered
+      setTimeout(() => {
+        // Find and fill DOI fields
+        if (doi) {
+          const doiValue = doi.startsWith('http') ? doi : `https://doi.org/${doi}`;
+          this.fillFieldsByPattern(formContainer, ['doi', 'article', 'paper', 'publication', 'work'], doiValue);
+        }
 
-      // Find and fill title fields
-      if (title) {
-        this.fillFieldsByPattern(formContainer, ['title', 'label'], title, 'text');
-      }
+        // Find and fill title fields
+        if (title) {
+          this.fillFieldsByPattern(formContainer, ['title', 'label'], title, 'text');
+        }
 
-      // Find and fill URL fields (if no DOI, use URL)
-      if (url && !doi) {
-        this.fillFieldsByPattern(formContainer, ['url', 'uri', 'link'], url);
-      }
+        // Find and fill URL fields (if no DOI, use URL)
+        if (url && !doi) {
+          this.fillFieldsByPattern(formContainer, ['url', 'uri', 'link'], url);
+        }
 
-      // Find and fill author fields
-      if (authors) {
-        this.fillFieldsByPattern(formContainer, ['author', 'creator'], authors, 'text');
-      }
+        // Find and fill author fields
+        if (authors) {
+          this.fillFieldsByPattern(formContainer, ['author', 'creator'], authors, 'text');
+        }
 
-      // Find and fill year fields
-      if (year) {
-        this.fillFieldsByPattern(formContainer, ['year', 'date'], year, 'text');
-      }
+        // Find and fill year fields
+        if (year) {
+          this.fillFieldsByPattern(formContainer, ['year', 'date'], year, 'text');
+        }
 
-      console.log('[nanopub-view] ✅ Form pre-filled successfully');
-    }, 300);
+        console.log('[nanopub-view] ✅ Form pre-filled successfully');
+      }, 300);
 
-  } catch (error: any) {
-    console.error('[nanopub-view] Error pre-filling form:', error);
+    } catch (error: any) {
+      console.error('[nanopub-view] Error pre-filling form:', error);
+    }
   }
-}
 
-/**
+  /**
  * Find and fill form fields matching patterns
  */
 private static fillFieldsByPattern(
@@ -110,14 +110,20 @@ private static fillFieldsByPattern(
   value: string, 
   inputType: 'url' | 'text' = 'url'
 ) {
+  console.log(`[nanopub-view] fillFieldsByPattern: patterns=${patterns.join(',')} value=${value.substring(0, 30)}...`);
+  
   // Find all input and textarea elements
   const inputs = container.querySelectorAll('input, textarea');
+  let filled = false;
   
   inputs.forEach((input: Element) => {
     const inputEl = input as HTMLInputElement | HTMLTextAreaElement;
     
     // Skip if already has a value
-    if (inputEl.value && inputEl.value.trim() !== '') return;
+    if (inputEl.value && inputEl.value.trim() !== '') {
+      console.log(`[nanopub-view] Skipping field (has value): ${inputEl.id || inputEl.name}`);
+      return;
+    }
     
     // Check input attributes for pattern matches
     const id = (inputEl.id || '').toLowerCase();
@@ -126,31 +132,50 @@ private static fillFieldsByPattern(
     const type = inputEl.type?.toLowerCase() || '';
     
     // Check label text
-    const label = inputEl.closest('.form-field')?.querySelector('label');
+    const formField = inputEl.closest('.form-field') || inputEl.parentElement;
+    const label = formField?.querySelector('label');
     const labelText = (label?.textContent || '').toLowerCase();
     
     // Match against patterns
-    const matchesPattern = patterns.some(pattern => 
-      id.includes(pattern) || 
-      name.includes(pattern) || 
-      placeholder.includes(pattern) ||
-      labelText.includes(pattern)
-    );
+    const matchesPattern = patterns.some(pattern => {
+      const p = pattern.toLowerCase();
+      return id.includes(p) || 
+             name.includes(p) || 
+             placeholder.includes(p) ||
+             labelText.includes(p);
+    });
     
-    // For URL type, also check input type
+    // For URL type, check input type; for text, accept text inputs and textareas
     const matchesType = inputType === 'url' 
       ? (type === 'url' || type === 'text')
-      : (type === 'text' || inputEl.tagName === 'TEXTAREA');
+      : (type === 'text' || type === '' || inputEl.tagName === 'TEXTAREA');
     
     if (matchesPattern && matchesType) {
+      console.log(`[nanopub-view] ✅ Matched field: id="${id}" name="${name}" label="${labelText.substring(0, 30)}"`);
       inputEl.value = value;
-      // Trigger change event so form state updates
-      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-      console.log(`[nanopub-view] Filled field: ${id || name} with ${value.substring(0, 50)}...`);
+      filled = true;
+      
+      // Trigger change event - use Zotero-compatible method
+      try {
+        const doc = inputEl.ownerDocument;
+        const inputEvent = doc.createEvent('Event');
+        inputEvent.initEvent('input', true, true);
+        inputEl.dispatchEvent(inputEvent);
+        
+        const changeEvent = doc.createEvent('Event');
+        changeEvent.initEvent('change', true, true);
+        inputEl.dispatchEvent(changeEvent);
+      } catch (e) {
+        console.log('[nanopub-view] Event dispatch fallback for:', id || name);
+      }
     }
   });
+  
+  if (!filled) {
+    console.log(`[nanopub-view] ⚠️ No field matched patterns: ${patterns.join(', ')}`);
+  }
 }
+
   private static async createFormTab(templateUri: string, preSelectedItem?: Zotero.Item) {
     const win = Zotero.getMainWindow();
     
@@ -221,12 +246,13 @@ private static fillFieldsByPattern(
       await creator.renderFromTemplateUri(templateUri, formContainer);
       
       console.log('[nanopub-view] ✅ Form rendered successfully');
-      // 🆕 PRE-FILL FORM WITH ITEM METADATA
+      
+      // PRE-FILL FORM WITH ITEM METADATA
       if (preSelectedItem) {
         this.prefillFormFromItem(formContainer, preSelectedItem);
       }     
 
-      // 🔥 APPLY DARK MODE STYLES AFTER RENDERING
+      // APPLY DARK MODE STYLES AFTER RENDERING
       if (isDarkMode) {
         console.log('[nanopub-view] Applying dark mode styles AFTER render...');
         this.applyDarkModeStyles(formContainer);
@@ -249,8 +275,266 @@ private static fillFieldsByPattern(
   }
 
   /**
+   * Show template workflow with annotation data pre-filled
+   */
+  static async showTemplateWorkflowWithAnnotation(
+    item: Zotero.Item,
+    templateUri: string,
+    annotationData: {
+      quoteText: string;
+      quoteEnd: string;
+      comment: string;
+      pageLabel: string;
+    }
+  ) {
+    try {
+      const creator = Zotero.Nanopub.creator;
+      
+      if (!creator.hasProfile()) {
+        Services.prompt.alert(
+          null,
+          'No Profile',
+          'Please setup your nanopub profile first.\n\n' +
+          'Go to Zotero Settings → Science Live'
+        );
+        return;
+      }
+
+      await this.createFormTabWithAnnotation(templateUri, item, annotationData);
+
+    } catch (error: any) {
+      console.error('[nanopub-view ERROR] Template workflow failed:', error);
+      Services.prompt.alert(
+        null,
+        'Error',
+        `Failed to create nanopublication:\n${error.message}`
+      );
+    }
+  }
+
+  /**
+   * Create form tab with annotation data
+   */
+  private static async createFormTabWithAnnotation(
+    templateUri: string,
+    preSelectedItem: Zotero.Item,
+    annotationData: {
+      quoteText: string;
+      quoteEnd: string;
+      comment: string;
+      pageLabel: string;
+    }
+  ) {
+    const win = Zotero.getMainWindow();
+    
+    const tab = win.Zotero_Tabs.add({
+      type: 'library',
+      title: 'Create Nanopublication from Annotation',
+      select: true,
+      data: {}  // Add empty data object to prevent "tab.data is undefined" error
+    });
+
+    console.log('[nanopub-view] Created tab:', tab.id);
+
+    await Zotero.Promise.delay(200);
+
+    let container = tab.container || tab.deck;
+    if (!container) {
+      const tabElement = win.document.getElementById(tab.id);
+      if (tabElement) {
+        container = tabElement.querySelector('.tab-content') || 
+                   tabElement.querySelector('[role="tabpanel"]') ||
+                   tabElement;
+      }
+    }
+    
+    if (!container) {
+      throw new Error('Could not find tab container');
+    }
+
+    const formContainer = win.document.createElement('div');
+    formContainer.id = 'nanopub-form-container';
+    
+    const isDarkMode = this.isZoteroDarkMode(win);
+    console.log('[nanopub-view] 🌙 Dark mode detected:', isDarkMode);
+    
+    if (isDarkMode) {
+      formContainer.setAttribute('data-theme', 'dark');
+      formContainer.classList.add('dark-mode');
+      formContainer.classList.add('dark');
+    }
+    
+    formContainer.style.cssText = `
+      padding: 20px;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+    `;
+
+    container.innerHTML = '';
+    container.appendChild(formContainer);
+
+    try {
+      const creator = Zotero.Nanopub.creator;
+      
+      console.log('[nanopub-view] Rendering form for annotation...');
+
+      let generatedTrigContent: string | null = null;
+
+      const submitHandler = (data: any) => {
+        generatedTrigContent = data.trigContent;
+        this.handleFormSubmit(generatedTrigContent, preSelectedItem, tab.id);
+      };
+
+      creator.on('submit', submitHandler);
+      await creator.renderFromTemplateUri(templateUri, formContainer);
+      
+      console.log('[nanopub-view] ✅ Form rendered successfully');
+
+      // Apply dark mode styles
+      if (isDarkMode) {
+        console.log('[nanopub-view] Applying dark mode styles AFTER render...');
+        this.applyDarkModeStyles(formContainer);
+      }
+
+      // Inject styles
+      this.injectStyles(formContainer, isDarkMode);
+
+      // Pre-fill form with item metadata AND annotation data
+      this.prefillFormFromItemAndAnnotation(formContainer, preSelectedItem, annotationData);
+
+    } catch (error: any) {
+      console.error('[nanopub-view ERROR] Failed to render form:', error);
+      
+      formContainer.innerHTML = `
+        <div style="padding: 40px; color: ${isDarkMode ? '#fff' : '#000'};">
+          <h2 style="color: #d32f2f;">Error Loading Template</h2>
+          <p>Failed to load the template form:</p>
+          <pre style="background: ${isDarkMode ? '#333' : '#f5f5f5'}; padding: 10px; border-radius: 4px;">${error.message}</pre>
+        </div>
+      `;
+    }
+  }
+
+ /**
+ * Pre-fill form fields with item metadata AND annotation data
+ */
+private static prefillFormFromItemAndAnnotation(
+  formContainer: HTMLElement, 
+  item: Zotero.Item,
+  annotationData: {
+    quoteText: string;
+    quoteEnd: string;
+    comment: string;
+    pageLabel: string;
+  }
+) {
+  try {
+    const doi = item.getField('DOI');
+    const url = item.getField('url');
+
+    console.log('[nanopub-view] Pre-filling form with item and annotation data');
+    console.log('[nanopub-view] DOI:', doi);
+    console.log('[nanopub-view] Quote text:', annotationData.quoteText?.substring(0, 50));
+    console.log('[nanopub-view] Comment:', annotationData.comment?.substring(0, 50));
+
+    // Delay to ensure form is fully rendered
+    setTimeout(() => {
+      // Direct field targeting by name attribute
+      
+      // st01_object = DOI field ("quotes from")
+      if (doi) {
+        const doiValue = doi.startsWith('http') ? doi : `https://doi.org/${doi}`;
+        this.fillFieldByName(formContainer, 'st01_object', doiValue);
+      } else if (url) {
+        this.fillFieldByName(formContainer, 'st01_object', url);
+      }
+
+      // st02_object = Quotation field ("has quoted text")
+      if (annotationData.quoteText) {
+        this.fillFieldByName(formContainer, 'st02_object', annotationData.quoteText);
+      }
+
+      // st03_object = Quote end field ("has quoted text end")
+      if (annotationData.quoteEnd) {
+        this.fillFieldByName(formContainer, 'st03_object', annotationData.quoteEnd);
+      }
+
+      // st04_object = Comment field ("has comment")
+      if (annotationData.comment) {
+        this.fillFieldByName(formContainer, 'st04_object', annotationData.comment);
+      }
+
+      console.log('[nanopub-view] ✅ Form pre-fill complete');
+    }, 600);
+
+  } catch (error: any) {
+    console.error('[nanopub-view] Error pre-filling form:', error);
+  }
+}
+
+/**
+ * Fill a specific field by its name attribute
+ */
+private static fillFieldByName(container: HTMLElement, fieldName: string, value: string) {
+  console.log(`[nanopub-view] Looking for field with name="${fieldName}"`);
+  
+  // Try multiple selectors
+  let field: HTMLInputElement | HTMLTextAreaElement | null = null;
+  
+  // Try by name
+  field = container.querySelector(`[name="${fieldName}"]`) as HTMLInputElement | HTMLTextAreaElement;
+  
+  // Try by id
+  if (!field) {
+    field = container.querySelector(`#field_${fieldName}`) as HTMLInputElement | HTMLTextAreaElement;
+  }
+  
+  // Try partial match on name
+  if (!field) {
+    field = container.querySelector(`[name*="${fieldName}"]`) as HTMLInputElement | HTMLTextAreaElement;
+  }
+  
+  if (field) {
+    console.log(`[nanopub-view] ✅ Found field: name="${field.name}" id="${field.id}" tag="${field.tagName}"`);
+    
+    // Only fill if empty
+    if (!field.value || field.value.trim() === '') {
+      field.value = value;
+      
+      // Trigger events
+      try {
+        const doc = field.ownerDocument;
+        const inputEvent = doc.createEvent('Event');
+        inputEvent.initEvent('input', true, true);
+        field.dispatchEvent(inputEvent);
+        
+        const changeEvent = doc.createEvent('Event');
+        changeEvent.initEvent('change', true, true);
+        field.dispatchEvent(changeEvent);
+        
+        console.log(`[nanopub-view] ✅ Filled field "${fieldName}" with: ${value.substring(0, 50)}...`);
+      } catch (e) {
+        console.log(`[nanopub-view] Event dispatch error for ${fieldName}:`, e);
+      }
+    } else {
+      console.log(`[nanopub-view] Skipping field "${fieldName}" (already has value)`);
+    }
+  } else {
+    console.log(`[nanopub-view] ⚠️ Field not found: ${fieldName}`);
+    
+    // Debug: list all available fields
+    const allFields = container.querySelectorAll('input, textarea');
+    console.log(`[nanopub-view] Available fields in container:`);
+    allFields.forEach((f: Element) => {
+      const el = f as HTMLInputElement | HTMLTextAreaElement;
+      console.log(`  - name="${el.name}" id="${el.id}" tag="${el.tagName}"`);
+    });
+  }
+}
+
+  /**
    * Apply dark mode styles directly to elements using JavaScript
-   * This bypasses CSS variable issues in Zotero's rendering context
    */
   private static applyDarkModeStyles(container: HTMLElement): void {
     console.log('[nanopub-view] 🎨 Applying dark mode styles directly to elements...');
@@ -284,12 +568,10 @@ private static fillFieldsByPattern(
         (el as any).style.fontWeight = '600';
       });
       
-      // AGGRESSIVE: Find ANY element that contains "OPTIONAL" text or has clickable styling
-      // This should catch the collapsible headers
+      // Find collapsible elements
       const allElements = container.querySelectorAll('*');
       let collapsibleCount = 0;
       allElements.forEach((el: Element) => {
-        // Skip style tags, script tags, and other non-visual elements
         const tagName = el.tagName ? el.tagName.toLowerCase() : '';
         if (tagName === 'style' || tagName === 'script' || tagName === 'link' || tagName === 'meta' ||
             tagName === 'input' || tagName === 'textarea' || tagName === 'select' || tagName === 'button') {
@@ -299,36 +581,20 @@ private static fillFieldsByPattern(
         const text = (el as any).textContent || '';
         const style = (el as any).style;
         
-        // Skip elements with very long text content (could be CSS or large containers)
-        if (text.length > 300) {
-          return;
-        }
-        
-        // Skip elements with very short text (like lone arrows or emojis)
-        if (text.trim().length < 15) {
-          return;
-        }
-        
-        // Additional check: skip if it contains CSS-like content
+        if (text.length > 300) return;
+        if (text.trim().length < 15) return;
         if (text.includes('===') || text.includes('--bg-') || text.includes('--text-') || 
             text.includes('{') || text.includes('/*') || text.includes('var(') || 
             text.includes('#nanopub-form') || text.includes('.subject-group')) {
           return;
         }
         
-        // Check if it's a parent container, not the actual header
         const children = (el as any).children;
-        if (children && children.length > 5) {
-          return; // Skip large containers
-        }
+        if (children && children.length > 5) return;
         
-        // Must have cursor pointer to be considered
         const hasCursorPointer = style.cursor === 'pointer' || (el as any).onclick;
-        if (!hasCursorPointer) {
-          return;
-        }
+        if (!hasCursorPointer) return;
         
-        // Now check if it has collapsible-like content
         const hasOptionalText = text.includes('OPTIONAL');
         const hasGeometryIcon = text.includes('📍');
         const hasRelevantText = hasOptionalText || hasGeometryIcon || 
@@ -336,8 +602,6 @@ private static fillFieldsByPattern(
         
         if (hasRelevantText) {
           collapsibleCount++;
-          console.log('[nanopub-view] Styling potential collapsible:', text.substring(0, 50));
-          
           (el as any).style.backgroundColor = '#2d2d2d';
           (el as any).style.color = '#e5e5e5';
           (el as any).style.padding = '10px 12px';
@@ -353,12 +617,9 @@ private static fillFieldsByPattern(
           (el as any).style.alignItems = 'center';
           (el as any).style.flexWrap = 'nowrap';
           
-          // Fix any child elements that might be causing layout issues
-          // Reuse children variable from above
           if (children) {
             for (let i = 0; i < children.length; i++) {
               const child = children[i];
-              // If it's the OPTIONAL badge, ensure it doesn't cause wrapping
               if (child.textContent && child.textContent.includes('OPTIONAL')) {
                 child.style.flexShrink = '0';
                 child.style.marginLeft = '8px';
@@ -410,29 +671,12 @@ private static fillFieldsByPattern(
         });
       });
       
-      // OPTIONAL badges - make them visible with dark color
+      // OPTIONAL badges
       const optionalBadges = container.querySelectorAll('.optional-badge, [class*="optional"]');
       console.log('[nanopub-view] Found', optionalBadges.length, 'optional badge elements');
       optionalBadges.forEach((el: Element) => {
         const text = (el as any).textContent || '';
         if (text.includes('OPTIONAL')) {
-          (el as any).style.backgroundColor = '#1e3a5f';
-          (el as any).style.color = '#ffffff';
-          (el as any).style.padding = '3px 8px';
-          (el as any).style.borderRadius = '4px';
-          (el as any).style.fontSize = '0.75em';
-          (el as any).style.fontWeight = '600';
-          (el as any).style.display = 'inline-block';
-          (el as any).style.marginLeft = '8px';
-        }
-      });
-      
-      // Also find any text node containing just "OPTIONAL" and style its parent
-      const allTextElements = container.querySelectorAll('*');
-      allTextElements.forEach((el: Element) => {
-        const text = (el as any).textContent || '';
-        // If element text is exactly "OPTIONAL" or " OPTIONAL" or "OPTIONAL "
-        if (text.trim() === 'OPTIONAL' && (el as any).children.length === 0) {
           (el as any).style.backgroundColor = '#1e3a5f';
           (el as any).style.color = '#ffffff';
           (el as any).style.padding = '3px 8px';
@@ -482,7 +726,6 @@ private static fillFieldsByPattern(
       /* ===== CSS VARIABLES ===== */
       
       #nanopub-form-container {
-        /* Light mode */
         --bg-main: #ffffff;
         --bg-subtle: #f5f5f5;
         --bg-subject: #fef0f7;
@@ -497,7 +740,6 @@ private static fillFieldsByPattern(
         --button-text: #ffffff;
       }
 
-      /* Dark mode variables */
       #nanopub-form-container[data-theme="dark"],
       #nanopub-form-container.dark-mode,
       #nanopub-form-container.dark {
@@ -515,8 +757,6 @@ private static fillFieldsByPattern(
         --button-text: #ffffff;
       }
 
-      /* ===== BASE STYLES ===== */
-      
       #nanopub-form-container {
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         background: var(--bg-main);
@@ -526,14 +766,11 @@ private static fillFieldsByPattern(
         max-width: 100%;
       }
       
-      /* Ensure all child elements respect container width */
       #nanopub-form-container * {
         box-sizing: border-box;
         max-width: 100%;
       }
 
-      /* ===== FORM CONTROLS ===== */
-      
       .form-input,
       input:not([type="submit"]):not([type="button"]),
       textarea,
@@ -559,13 +796,11 @@ private static fillFieldsByPattern(
         border-color: var(--border-subject);
       }
       
-      /* Select dropdown options */
       select option {
         background: var(--input-bg);
         color: var(--input-text);
       }
 
-      /* Buttons */
       button,
       .btn-primary,
       input[type="submit"],
@@ -592,8 +827,6 @@ private static fillFieldsByPattern(
         transform: translateY(-1px);
       }
 
-      /* ===== SUBJECT GROUPS ===== */
-      
       .subject-group {
         background: var(--bg-subject);
         border: 2px solid var(--border-subject);
@@ -605,7 +838,6 @@ private static fillFieldsByPattern(
         box-sizing: border-box;
       }
       
-      /* DIRECT FALLBACK for dark mode if variables fail */
       #nanopub-form-container[data-theme="dark"] .subject-group,
       #nanopub-form-container.dark-mode .subject-group,
       #nanopub-form-container.dark .subject-group {
@@ -627,23 +859,6 @@ private static fillFieldsByPattern(
         display: block;
       }
       
-      /* ===== COLLAPSIBLE SECTIONS - AGGRESSIVE STYLING ===== */
-      
-      /* Target any element with cursor pointer that might be a collapsible header */
-      #nanopub-form-container [style*="cursor: pointer"],
-      #nanopub-form-container [style*="cursor:pointer"] {
-        background: var(--bg-subtle) !important;
-        color: var(--text-dark) !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        flex-wrap: nowrap !important;
-      }
-      
-      /* Dark mode for collapsibles */
       #nanopub-form-container[data-theme="dark"] [style*="cursor: pointer"],
       #nanopub-form-container.dark-mode [style*="cursor: pointer"],
       #nanopub-form-container.dark [style*="cursor: pointer"],
@@ -661,7 +876,6 @@ private static fillFieldsByPattern(
         flex-wrap: nowrap !important;
       }
       
-      /* DIRECT FALLBACK for dark mode text */
       #nanopub-form-container[data-theme="dark"] .subject-label,
       #nanopub-form-container.dark-mode .subject-label,
       #nanopub-form-container.dark .subject-label,
@@ -683,7 +897,6 @@ private static fillFieldsByPattern(
         color: #e5e5e5 !important;
       }
 
-      /* DIRECT FALLBACK for inputs */
       #nanopub-form-container[data-theme="dark"] input,
       #nanopub-form-container.dark-mode input,
       #nanopub-form-container.dark input,
@@ -698,7 +911,6 @@ private static fillFieldsByPattern(
         border-color: #525252 !important;
       }
       
-      /* DIRECT FALLBACK for select options */
       #nanopub-form-container[data-theme="dark"] select option,
       #nanopub-form-container.dark-mode select option,
       #nanopub-form-container.dark select option {
@@ -706,7 +918,6 @@ private static fillFieldsByPattern(
         color: #e5e5e5 !important;
       }
       
-      /* DIRECT FALLBACK for placeholders */
       #nanopub-form-container[data-theme="dark"] input::placeholder,
       #nanopub-form-container.dark-mode input::placeholder,
       #nanopub-form-container.dark input::placeholder,
@@ -717,7 +928,6 @@ private static fillFieldsByPattern(
         opacity: 0.7 !important;
       }
       
-      /* DIRECT FALLBACK for help text */
       #nanopub-form-container[data-theme="dark"] .field-help,
       #nanopub-form-container.dark-mode .field-help,
       #nanopub-form-container.dark .field-help,
@@ -730,8 +940,6 @@ private static fillFieldsByPattern(
         color: #a0a0a0 !important;
       }
 
-      /* ===== TYPOGRAPHY ===== */
-      
       p, span, div, label, legend, h1, h2, h3, h4, h5, h6 {
         color: var(--text-dark);
       }
@@ -740,8 +948,6 @@ private static fillFieldsByPattern(
         color: var(--text-light);
       }
 
-      /* ===== OPTIONAL FIELDS ===== */
-      
       .optional-badge {
         display: inline-block;
         margin-left: 0.5rem;
@@ -754,7 +960,6 @@ private static fillFieldsByPattern(
         text-transform: uppercase;
       }
       
-      /* Dark mode OPTIONAL badges - keep them visible */
       #nanopub-form-container[data-theme="dark"] .optional-badge,
       #nanopub-form-container.dark-mode .optional-badge,
       #nanopub-form-container.dark .optional-badge {
@@ -762,8 +967,6 @@ private static fillFieldsByPattern(
         color: #ffffff !important;
       }
 
-      /* ===== FORM HEADER ===== */
-      
       .form-header {
         margin-bottom: 2rem;
       }
@@ -820,12 +1023,8 @@ private static fillFieldsByPattern(
         );
 
         if (attachAsNote) {
-          // Use NanopubDisplay to create a rich formatted note
           const { NanopubDisplay } = await import("./nanopubDisplay");
           const display = new NanopubDisplay();
-          
-          // Use displayFromUri to create the same rich format as "Attach nanopublication"
-          // Pass isCreated=true to tag it appropriately
           await display.displayFromUri(preSelectedItem, displayUri, true);
           
           Services.prompt.alert(
