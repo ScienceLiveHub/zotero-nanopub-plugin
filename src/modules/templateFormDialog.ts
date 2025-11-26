@@ -41,6 +41,116 @@ export class TemplateFormDialog {
     }
   }
 
+  /**
+ * Pre-fill form fields with metadata from the selected Zotero item
+ */
+private static prefillFormFromItem(formContainer: HTMLElement, item: Zotero.Item) {
+  try {
+    // Extract metadata from Zotero item
+    const doi = item.getField('DOI');
+    const title = item.getField('title');
+    const url = item.getField('url');
+    const abstractText = item.getField('abstractNote');
+    
+    // Get authors
+    const creators = item.getCreators();
+    const authors = creators
+      .filter((c: any) => c.creatorType === 'author')
+      .map((c: any) => c.firstName ? `${c.firstName} ${c.lastName}` : c.lastName)
+      .join(', ');
+    
+    // Get year
+    const date = item.getField('date');
+    const year = date ? new Date(date).getFullYear().toString() : '';
+
+    console.log('[nanopub-view] Pre-filling form with:', { doi, title, authors, year });
+
+    // Small delay to ensure form is fully rendered
+    setTimeout(() => {
+      // Find and fill DOI fields
+      if (doi) {
+        const doiValue = doi.startsWith('http') ? doi : `https://doi.org/${doi}`;
+        this.fillFieldsByPattern(formContainer, ['doi', 'article', 'paper', 'publication', 'work'], doiValue);
+      }
+
+      // Find and fill title fields
+      if (title) {
+        this.fillFieldsByPattern(formContainer, ['title', 'label'], title, 'text');
+      }
+
+      // Find and fill URL fields (if no DOI, use URL)
+      if (url && !doi) {
+        this.fillFieldsByPattern(formContainer, ['url', 'uri', 'link'], url);
+      }
+
+      // Find and fill author fields
+      if (authors) {
+        this.fillFieldsByPattern(formContainer, ['author', 'creator'], authors, 'text');
+      }
+
+      // Find and fill year fields
+      if (year) {
+        this.fillFieldsByPattern(formContainer, ['year', 'date'], year, 'text');
+      }
+
+      console.log('[nanopub-view] ✅ Form pre-filled successfully');
+    }, 300);
+
+  } catch (error: any) {
+    console.error('[nanopub-view] Error pre-filling form:', error);
+  }
+}
+
+/**
+ * Find and fill form fields matching patterns
+ */
+private static fillFieldsByPattern(
+  container: HTMLElement, 
+  patterns: string[], 
+  value: string, 
+  inputType: 'url' | 'text' = 'url'
+) {
+  // Find all input and textarea elements
+  const inputs = container.querySelectorAll('input, textarea');
+  
+  inputs.forEach((input: Element) => {
+    const inputEl = input as HTMLInputElement | HTMLTextAreaElement;
+    
+    // Skip if already has a value
+    if (inputEl.value && inputEl.value.trim() !== '') return;
+    
+    // Check input attributes for pattern matches
+    const id = (inputEl.id || '').toLowerCase();
+    const name = (inputEl.name || '').toLowerCase();
+    const placeholder = (inputEl.placeholder || '').toLowerCase();
+    const type = inputEl.type?.toLowerCase() || '';
+    
+    // Check label text
+    const label = inputEl.closest('.form-field')?.querySelector('label');
+    const labelText = (label?.textContent || '').toLowerCase();
+    
+    // Match against patterns
+    const matchesPattern = patterns.some(pattern => 
+      id.includes(pattern) || 
+      name.includes(pattern) || 
+      placeholder.includes(pattern) ||
+      labelText.includes(pattern)
+    );
+    
+    // For URL type, also check input type
+    const matchesType = inputType === 'url' 
+      ? (type === 'url' || type === 'text')
+      : (type === 'text' || inputEl.tagName === 'TEXTAREA');
+    
+    if (matchesPattern && matchesType) {
+      inputEl.value = value;
+      // Trigger change event so form state updates
+      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+      console.log(`[nanopub-view] Filled field: ${id || name} with ${value.substring(0, 50)}...`);
+    }
+  });
+}
   private static async createFormTab(templateUri: string, preSelectedItem?: Zotero.Item) {
     const win = Zotero.getMainWindow();
     
@@ -111,6 +221,10 @@ export class TemplateFormDialog {
       await creator.renderFromTemplateUri(templateUri, formContainer);
       
       console.log('[nanopub-view] ✅ Form rendered successfully');
+      // 🆕 PRE-FILL FORM WITH ITEM METADATA
+      if (preSelectedItem) {
+        this.prefillFormFromItem(formContainer, preSelectedItem);
+      }     
 
       // 🔥 APPLY DARK MODE STYLES AFTER RENDERING
       if (isDarkMode) {

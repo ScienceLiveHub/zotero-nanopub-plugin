@@ -99,41 +99,140 @@ export class MenuManager {
     }
   }
 
-  /**
-   * Register context menu items
-   */
-  private registerContextMenu() {
-    try {
-      const win = Zotero.getMainWindow();
-      if (!win) {
-        error("No main window for context menu");
-        return;
-      }
+ /**
+ * Register context menu items (called once at startup)
+ */
+private registerContextMenu() {
+  try {
+    const win = Zotero.getMainWindow();
+    if (!win) {
+      error("No main window for context menu");
+      return;
+    }
 
-      const doc = win.document;
+    const doc = win.document;
+    
+    // Find the Zotero item context menu
+    const itemMenu = doc.getElementById('zotero-itemmenu');
+    if (!itemMenu) {
+      error("Item menu not found");
+      return;
+    }
+
+    log("Found item menu, adding context menu items...");
+
+    // Add separator
+    const separator = doc.createXULElement ? 
+      doc.createXULElement('menuseparator') : 
+      doc.createElement('menuseparator');
+    separator.id = 'nanopub-context-separator';
+    itemMenu.appendChild(separator);
+
+    // Add "Create Nanopublication" menu with template submenu
+    const createNanopubMenu = doc.createXULElement ? 
+      doc.createXULElement('menu') : 
+      doc.createElement('menu');
+    createNanopubMenu.id = 'nanopub-context-create-menu';
+    createNanopubMenu.setAttribute('label', '✨ Create Nanopublication');
+
+    // Create submenu popup for templates
+    const createNanopubPopup = doc.createXULElement ? 
+      doc.createXULElement('menupopup') : 
+      doc.createElement('menupopup');
+    createNanopubPopup.id = 'nanopub-context-create-popup';
+
+    // Add menu items for each template
+    const templates = TemplateBrowser.getPopularTemplates();
+    
+    templates.forEach((template, index) => {
+      const menuItem = doc.createXULElement ? 
+        doc.createXULElement('menuitem') : 
+        doc.createElement('menuitem');
       
-      // Find the items tree
-      const itemsTree = doc.getElementById('zotero-items-tree');
-      if (!itemsTree) {
-        error("Items tree not found");
-        return;
-      }
-
-      log("Found items tree, adding context menu listener...");
-
-      const self = this;
-      itemsTree.addEventListener('contextmenu', function(event: any) {
-        // Small delay to ensure menu is created
-        setTimeout(function() {
-          self.addContextMenuItems();
-        }, 50);
+      menuItem.id = `nanopub-context-template-${index}`;
+      menuItem.setAttribute('label', `${template.icon} ${template.name}`);
+      
+      // Capture template URI in closure
+      const templateUri = template.uri;
+      menuItem.addEventListener('command', function() {
+        // Get selected item at the time of click
+        const pane = Zotero.getActiveZoteroPane();
+        const selectedItems = pane ? pane.getSelectedItems() : [];
+        const selectedItem = selectedItems.length > 0 && selectedItems[0].isRegularItem() ? selectedItems[0] : null;
+        
+        TemplateFormDialog.showTemplateWorkflow(selectedItem, templateUri);
       });
       
-      log("Context menu listener added successfully");
-    } catch (err: any) {
-      error("Error setting up context menu:", err);
-    }
+      createNanopubPopup.appendChild(menuItem);
+    });
+
+    createNanopubMenu.appendChild(createNanopubPopup);
+    itemMenu.appendChild(createNanopubMenu);
+
+    // Add "Attach Nanopublication..." menu item
+    const importItem = doc.createXULElement ? 
+      doc.createXULElement('menuitem') : 
+      doc.createElement('menuitem');
+    importItem.id = 'nanopub-context-import';
+    importItem.setAttribute('label', '📎 Attach Nanopublication...');
+    
+    const self = this;
+    importItem.addEventListener('command', function() {
+      self.importNanopubByUrl();
+    });
+    itemMenu.appendChild(importItem);
+
+    // Add "Search Related Nanopublications" menu item
+    const searchItem = doc.createXULElement ? 
+      doc.createXULElement('menuitem') : 
+      doc.createElement('menuitem');
+    searchItem.id = 'nanopub-context-search';
+    searchItem.setAttribute('label', '🔍 Search Related Nanopublications');
+    
+    searchItem.addEventListener('command', function() {
+      self.searchRelatedNanopubs();
+    });
+    itemMenu.appendChild(searchItem);
+
+    // Listen for menu showing to update enabled/disabled state
+    itemMenu.addEventListener('popupshowing', function() {
+      self.updateContextMenuState();
+    });
+    
+    log("Context menu items registered successfully");
+  } catch (err: any) {
+    error("Error setting up context menu:", err);
   }
+}
+
+/**
+ * Update context menu item states when menu opens
+ */
+private updateContextMenuState() {
+  try {
+    const win = Zotero.getMainWindow();
+    if (!win) return;
+
+    const doc = win.document;
+    
+    // Get selected item
+    const pane = Zotero.getActiveZoteroPane();
+    const selectedItems = pane ? pane.getSelectedItems() : [];
+    const hasValidItem = selectedItems.length > 0 && selectedItems[0].isRegularItem();
+
+    // Update "Create Nanopublication" menu state
+    const createMenu = doc.getElementById('nanopub-context-create-menu');
+    if (createMenu) {
+      if (hasValidItem) {
+        createMenu.removeAttribute('disabled');
+      } else {
+        createMenu.setAttribute('disabled', 'true');
+      }
+    }
+  } catch (err: any) {
+    error("Error updating context menu state:", err);
+  }
+}
 
   /**
    * Register nanopub creation menu items with dynamic template submenu
@@ -210,124 +309,6 @@ export class MenuManager {
     }
   }
 
-  /**
-   * Add items to context menu when it opens
-   */
-  private addContextMenuItems() {
-    try {
-      const win = Zotero.getMainWindow();
-      if (!win) return;
-
-      const doc = win.document;
-      
-      // Find the open popup/menu
-      const popup = doc.querySelector('menupopup[open="true"]');
-      
-      if (!popup) {
-        log("No open popup found");
-        return;
-      }
-
-      log("Found open popup, adding menu items...");
-
-      // Remove old items if they exist
-      const oldSeparator = doc.getElementById('nanopub-context-separator');
-      if (oldSeparator) oldSeparator.remove();
-      
-      const oldCreateMenu = doc.getElementById('nanopub-context-create-menu');
-      if (oldCreateMenu) oldCreateMenu.remove();
-      
-      const oldImportItem = doc.getElementById('nanopub-context-import');
-      if (oldImportItem) oldImportItem.remove();
-
-      const oldSearchItem = doc.getElementById('nanopub-context-search');
-      if (oldSearchItem) oldSearchItem.remove();
-
-      // Get selected item to pass to template workflow
-      const pane = Zotero.getActiveZoteroPane();
-      const selectedItems = pane ? pane.getSelectedItems() : [];
-      const selectedItem = selectedItems.length > 0 && selectedItems[0].isRegularItem() ? selectedItems[0] : null;
-
-      // Add separator
-      const separator = doc.createXULElement ? 
-        doc.createXULElement('menuseparator') : 
-        doc.createElement('menuseparator');
-      separator.id = 'nanopub-context-separator';
-
-      // Add "Create Nanopublication" menu with template submenu
-      const createNanopubMenu = doc.createXULElement ? 
-        doc.createXULElement('menu') : 
-        doc.createElement('menu');
-      createNanopubMenu.id = 'nanopub-context-create-menu';
-      createNanopubMenu.setAttribute('label', '✨ Create Nanopublication');
-      
-      // Disable if no valid item selected
-      if (!selectedItem) {
-        createNanopubMenu.setAttribute('disabled', 'true');
-      }
-
-      // Create submenu popup for templates
-      const createNanopubPopup = doc.createXULElement ? 
-        doc.createXULElement('menupopup') : 
-        doc.createElement('menupopup');
-      createNanopubPopup.id = 'nanopub-context-create-popup';
-
-      // Dynamically add menu items for each template
-      const templates = TemplateBrowser.getPopularTemplates();
-      
-      templates.forEach((template, index) => {
-        const menuItem = doc.createXULElement ? 
-          doc.createXULElement('menuitem') : 
-          doc.createElement('menuitem');
-        
-        menuItem.id = `nanopub-context-template-${index}`;
-        menuItem.setAttribute('label', `${template.icon} ${template.name}`);
-        
-        // Capture template URI and selected item in closure
-        const templateUri = template.uri;
-        const itemToUse = selectedItem;
-        menuItem.addEventListener('command', function() {
-          TemplateFormDialog.showTemplateWorkflow(itemToUse, templateUri);
-        });
-        
-        createNanopubPopup.appendChild(menuItem);
-      });
-
-      createNanopubMenu.appendChild(createNanopubPopup);
-
-      // Add "Attach Nanopublication..." menu item
-      const importItem = doc.createXULElement ? 
-        doc.createXULElement('menuitem') : 
-        doc.createElement('menuitem');
-      importItem.id = 'nanopub-context-import';
-      importItem.setAttribute('label', '📎 Attach Nanopublication...');
-      
-      const self = this;
-      importItem.addEventListener('command', function() {
-        self.importNanopubByUrl();
-      });
-
-      // Add "Search Related Nanopublications" menu item
-      const searchItem = doc.createXULElement ? 
-        doc.createXULElement('menuitem') : 
-        doc.createElement('menuitem');
-      searchItem.id = 'nanopub-context-search';
-      searchItem.setAttribute('label', '🔍 Search Related Nanopublications');
-      
-      searchItem.addEventListener('command', function() {
-        self.searchRelatedNanopubs();
-      });
-
-      popup.appendChild(separator);
-      popup.appendChild(createNanopubMenu);
-      popup.appendChild(importItem);
-      popup.appendChild(searchItem);
-      
-      log("Context menu items added");
-    } catch (err: any) {
-      error("Error adding context menu items:", err);
-    }
-  }
 
   /**
    * Search for and attach related nanopublications
