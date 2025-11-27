@@ -5,6 +5,7 @@ import { NanopubSearch } from "./modules/nanopubSearch";
 import { MenuManager } from "./modules/menu";
 import { ZoteroNanopubCreator } from './modules/nanopubCreator';
 import { registerPrefsWindow } from './modules/preferenceWindow';
+import { ReaderIntegration } from './modules/readerIntegration';
 
 // Declare global types
 declare global {
@@ -64,6 +65,7 @@ const initPlugin = () => {
   let searchModule: NanopubSearch | null = null;
   let menuManager: MenuManager | null = null;
   let nanopubCreator: ZoteroNanopubCreator | null = null;
+  let readerIntegration: ReaderIntegration | null = null;
 
   Zotero.Nanopub.onStartup = async function({
     id,
@@ -121,6 +123,17 @@ const initPlugin = () => {
         error("⚠️ Failed to initialize nanopub creator:", err);
         // Don't throw - let plugin continue without creation features
       }
+
+      // Initialize PDF reader integration
+      try {
+        readerIntegration = new ReaderIntegration();
+        readerIntegration.register();
+        Zotero.Nanopub.readerIntegration = readerIntegration;
+        log("✅ PDF reader integration initialized successfully");
+      } catch (err: any) {
+        error("⚠️ Failed to initialize reader integration:", err);
+        // Don't throw - let plugin continue without reader integration
+      }
       
       log("Nanopub Plugin started successfully!");
       log("=================================");
@@ -134,6 +147,12 @@ const initPlugin = () => {
   Zotero.Nanopub.onShutdown = function() {
     try {
       log("Nanopub Plugin shutting down...");
+      
+      // Cleanup reader integration
+      if (readerIntegration) {
+        readerIntegration.unregister();
+        readerIntegration = null;
+      }
       
       if (menuManager) {
         menuManager.cleanup();
