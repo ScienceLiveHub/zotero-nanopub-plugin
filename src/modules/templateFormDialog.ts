@@ -2,6 +2,8 @@
 // Template form dialog - FIXED VERSION with aggressive collapsible header styling
 
 export class TemplateFormDialog {
+  private static isSubmitting: boolean = false;
+  private static lastTabId: string | null = null;
   
   static async showTemplateWorkflow(preSelectedItem?: Zotero.Item, preSelectedTemplateUri?: string) {
     try {
@@ -191,6 +193,10 @@ private static fillFieldsByPattern(
 
     console.log('[nanopub-view] Created tab:', tab.id);
     
+    // Reset submission flag for new tab
+    TemplateFormDialog.isSubmitting = false;
+    TemplateFormDialog.lastTabId = tab.id;
+    
     await Zotero.Promise.delay(200);
 
     let container = tab.container || tab.deck;
@@ -236,10 +242,24 @@ private static fillFieldsByPattern(
       console.log('[nanopub-view] Rendering form...');
 
       let generatedTrigContent: string | null = null;
+      const currentTabId = tab.id;
 
       const submitHandler = (data: any) => {
+        // Prevent double submission
+        if (TemplateFormDialog.isSubmitting) {
+          console.log('[nanopub-view] Ignoring duplicate submit');
+          return;
+        }
+        
+        // Only process if this is the current tab
+        if (TemplateFormDialog.lastTabId !== currentTabId) {
+          console.log('[nanopub-view] Ignoring submit from old tab');
+          return;
+        }
+        
+        TemplateFormDialog.isSubmitting = true;
         generatedTrigContent = data.trigContent;
-        this.handleFormSubmit(generatedTrigContent, preSelectedItem, tab.id);
+        this.handleFormSubmit(generatedTrigContent, preSelectedItem, currentTabId);
       };
 
       creator.on('submit', submitHandler);
@@ -336,6 +356,10 @@ private static fillFieldsByPattern(
 
     console.log('[nanopub-view] Created tab:', tab.id);
 
+    // Reset submission flag for new tab
+    TemplateFormDialog.isSubmitting = false;
+    TemplateFormDialog.lastTabId = tab.id;
+
     await Zotero.Promise.delay(200);
 
     let container = tab.container || tab.deck;
@@ -380,10 +404,24 @@ private static fillFieldsByPattern(
       console.log('[nanopub-view] Rendering form for annotation...');
 
       let generatedTrigContent: string | null = null;
+      const currentTabId = tab.id;
 
       const submitHandler = (data: any) => {
+        // Prevent double submission
+        if (TemplateFormDialog.isSubmitting) {
+          console.log('[nanopub-view] Ignoring duplicate submit');
+          return;
+        }
+        
+        // Only process if this is the current tab
+        if (TemplateFormDialog.lastTabId !== currentTabId) {
+          console.log('[nanopub-view] Ignoring submit from old tab');
+          return;
+        }
+        
+        TemplateFormDialog.isSubmitting = true;
         generatedTrigContent = data.trigContent;
-        this.handleFormSubmit(generatedTrigContent, preSelectedItem, tab.id);
+        this.handleFormSubmit(generatedTrigContent, preSelectedItem, currentTabId);
       };
 
       creator.on('submit', submitHandler);
@@ -502,7 +540,7 @@ private static fillFieldByName(container: HTMLElement, fieldName: string, value:
     if (!field.value || field.value.trim() === '') {
       field.value = value;
       
-      // Trigger events
+      // Trigger events to notify the form library
       try {
         const doc = field.ownerDocument;
         const inputEvent = doc.createEvent('Event');
@@ -1041,9 +1079,15 @@ private static fillFieldByName(container: HTMLElement, fieldName: string, value:
         const win = Zotero.getMainWindow();
         win.Zotero_Tabs.close(tabId);
       }
+      
+      // Reset submission flag after successful completion
+      TemplateFormDialog.isSubmitting = false;
 
     } catch (error: any) {
       console.error('[nanopub-view ERROR] Failed to publish:', error);
+      
+      // Reset submission flag on error so user can retry
+      TemplateFormDialog.isSubmitting = false;
       
       Services.prompt.alert(
         null,
