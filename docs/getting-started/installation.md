@@ -14,11 +14,20 @@
 
 ![Nanopub Zotero plugin installation](../assets/images/plugin-installation.png)
 
+
+Check the [Science Live Zotero plugin install and setup Video](https://youtu.be/BLeYIeLI6co) to get a step by step guide to install and setup the Science Live Zotero Plugin.
+
 ## Verify Installation
 
 Right-click any item in your Zotero library and look for:
-- "Create Nanopublication on"
+
+- "Create Nanopublication"
+- "Attach Nanopublication"
 - "Search Related Nanopublications"
+
+![Nanopub Zotero Item Menu](../assets/images/ItemMenu.png)
+
+Similar menu can be found from the "File" tab:
 
 ![Nanopub Zotero File Menu](../assets/images/File-menu.png)
 

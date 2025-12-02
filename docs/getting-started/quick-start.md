@@ -15,14 +15,14 @@ Create your first nanopublication in 5 minutes - **entirely within Zotero!**
 
 Your nanopubs are signed with your ORCID for proper attribution.
 
-1. In Zotero, go to **File → Setup Nanopub Profile**
+1. In Zotero, go to **Zotero → Settings** or **File → Preferences**.
+2. Select the **Science Live** Panel
 2. Enter your full name (e.g., "Jane Smith")
-![Screenshot: Profile setup name dialog](../assets/images/setup-profile-name.png)
 3. Enter your ORCID (e.g., `0000-0002-1234-5678` or `https://orcid.org/0000-0002-1234-5678`)
 ![Screenshot: Profile setup orcid dialog](../assets/images/setup-profile-orcid.png)
 4. Click **OK**
+![Screenshot: Profile setup name dialog](../assets/images/setup-profile-name.png)
 5. To check your profile, go to  **File → Show  Nanopub Profile** 
-![Screenshot: Show Profile](../assets/images/profile-orcid.png)
 
 The plugin generates cryptographic keys and stores them securely in Zotero.
 
