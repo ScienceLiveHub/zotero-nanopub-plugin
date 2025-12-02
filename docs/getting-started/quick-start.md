@@ -15,14 +15,13 @@ Create your first nanopublication in 5 minutes - **entirely within Zotero!**
 
 Your nanopubs are signed with your ORCID for proper attribution.
 
-1. In Zotero, go to **Zotero → Settings** or **File → Preferences**.
+1. In Zotero, go to **Zotero → Settings** or if Zotero menu does not exist, go to **Edit → Settings**.
 2. Select the **Science Live** Panel
 2. Enter your full name (e.g., "Jane Smith")
 3. Enter your ORCID (e.g., `0000-0002-1234-5678` or `https://orcid.org/0000-0002-1234-5678`)
-![Screenshot: Profile setup orcid dialog](../assets/images/setup-profile-orcid.png)
-4. Click **OK**
+4. Click **Save Profile**
 ![Screenshot: Profile setup name dialog](../assets/images/setup-profile-name.png)
-5. To check your profile, go to  **File → Show  Nanopub Profile** 
+5. To check your profile, click on **View Profile** on the same setup panel.
 
 The plugin generates cryptographic keys and stores them securely in Zotero.
 
@@ -46,14 +45,14 @@ Pick any paper from your Zotero library that you want to annotate.
 ## Step 3: Start Creating a Nanopub (1 minute)
 
 **Option A: Right-click menu** (recommended)
+
 1. **Right-click** the paper
 2. Hover over **"Create Nanopublication"**
-3. Choose a template from the submenu:
+3. Choose the CiTO template from the submenu:
    - **📚 Citation**: Describe paper relationships.  *Good for first-time users*
-   - **📝 Explain your citation**: Select the text you’re citing and explain why you reference it.  *Good for explaining exactly which part you cite and why.*
-   - **🌍 Geographical Coverage**: Identify the geographical area discussed in the paper and support it with a quote. *Good for documenting which geographical area is discussed in the paper.*
 
 **Option B: File menu**
+
 1. Go to **File → Create Nanopublication**
 2. Choose a template from the submenu
 
@@ -65,52 +64,48 @@ We’re adding new templates as we develop the Nanopublication Zotero plugin —
 
 A new tab opens in Zotero with an interactive form:
 
-![Screenshot: Zotero tab with nanopub creation form](../assets/images/annotating-paper-form.png)
+![Screenshot: Zotero tab with nanopub creation form](../assets/images/cito-form.png)
 
 The form is automatically pre-filled with information from your selected paper:
-- Author information
 
-**Just add your content:**
+- DOI of the paper
 
-- DOI or URI when requested
-- For "Explain your citation" template: Add a quote from the paper you’re referencing and explain why you think it’s worth citing.
-- The form shows clear labels for each field
-- Required fields are marked with *
+!!! note
+    Be careful since the DOI of the paper will be filled everywhere! For the CiTO nanopublication form, we need to update the second one that corresponds to the paper cited in the item you selected.
 
-**Example for a Explain your citation:**
+- Author information 
 
-- After selecting, "Annotate a paper quotation" as the type of nanopublication, view the paper (e.g. PDF Viewer) and select a short quote in the paper. If the text selected is more than 500 characters, we suggest to select the first sentence (short). Then select the last sentence from the quote and paste it in the optional field form "has quoted text end".
 
-- Then, in the "has comment" field, explain why you selected this quote, what the passage claims, and why it’s relevant.
+!!! note
+    The Author information is not visible from the form but taken from your Science Live keys as explained during the set up.
 
-Click **"Create Nanopublication"** when done. Please bear in mind that you need to set up your Nanopub profile before creating nanopublication in Zotero.
+- Select the citation type and enter the DOI of the paper you want to reference. The paper should appear in the list of references, but at the moment no checks are performed.
+
+!!! note
+    In the example above, we use *cites as authority* as the citation type, and the DOI of the cited paper is: [https://doi.org/10.1016/j.gloenvcha.2008.12.003](https://doi.org/10.1016/j.gloenvcha.2008.12.003).
+
+- Click on "**Create Nanopublication**". You will be notified once the nanopublication is successfully created and added as a note under your item.
+
+
+!!! warning
+    A nanopublication is immediately created when you click on "Create Nanopublication".
+
+![Screenshot: Success - Nanopublication created](../assets/images/success-published-nanopub.png)
+
+If you want to add the newly created nanopublication as a note under your item, select **OK**; otherwise, select **Cancel**.
+
+![Screenshot: Success - Nanopublication created](../assets/images/note-added.png)
 
 ---
 
-## Step 5: Watch It Publish (30 seconds)
+## Step 5: View Your Nanopublication in Zotero
 
-The plugin automatically:
+Once the nanopublication is added as a note to your selected item, you can check and display its content by clicking on it.
 
-1. **Generates** the nanopublication in TriG format
-2. **Signs** it with your ORCID and keys (using WASM cryptography)
-3. **Publishes** it to the nanopub network
-4. **Creates** a rich note attached to your Zotero item
-
-You'll see a success message with your nanopub URI! 
-
----
-
-## Step 6: View Your Nanopub
-
-You can add your newly published nanopublication as a note to the paper you selected to generate it from.
-
-Once added a new window pops up: *Success: Nanopublication attached successfully! Check the notes attached to your selected item.*
-
-You can check and display the content of the note by clicking on it.
-
-![Screenshot: Rich note in Zotero showing the nanopub](../assets/images/nanopub-view.png)
+![Screenshot: Rich note in Zotero showing the nanopub](../assets/images/cito-view-from-zotero.png)
 
 The rich note includes:
+
 - Formatted display
 - Your name and ORCID
 - Publication date
@@ -119,8 +114,6 @@ The rich note includes:
 - Share/cite nanopublication
 
 **View online:** Click the URI link to see your nanopub on the nanopub network.
-
-**Search for your work:** Visit [Nanodash](https://nanodash.knowledgepixels.com/) and search for your ORCID to see all your nanopubs.
 
 ---
 
@@ -152,14 +145,17 @@ You created a **nanopublication** - a tiny, semantic, citable unit of knowledge 
 **Try a different template:**
 
 - Create another nanopub
-- Choose **"📚 Citation"** template
-- Use CiTO (Citation Typing Ontology) to describe paper relationships
+- Choose **"📚 Comment on paper"** template
+- Use CiTO (Citation Typing Ontology) to comment on a paper.
 
 **Import a nanopub:**
 
-- Find an interesting nanopub URI (search on Nanodash)
+- Find an interesting nanopub URI (search on the Science Live Platform or directly on Nanodash)
 - **File → Import Nanopublication as New Item**
 - It's added to your library
+
+!!! note
+    If you want to add a nanopublication as a note under an item, please select **File → Import Nanopublication (Attach to Item)" or right click on a given item and select "Attach Nanopublication".
 
 ### Learn More
 
