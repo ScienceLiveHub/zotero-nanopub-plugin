@@ -79,11 +79,12 @@ Manage your ORCID identity and cryptographic keys.
 
 ### Setup Your Profile
 
-**File → Setup Nanopub Profile**
+**Zotero → Settings** or **Edit → Settings** (depending on the Zotero version and your Operating System).
 
 Enter:
 - Your full name
 - Your ORCID (with or without https://orcid.org/ prefix)
+- Click on **Save Profile**
 
 The plugin:
 - Generates RSA key pairs for signing
@@ -92,18 +93,13 @@ The plugin:
 
 ![Screenshot: Profile setup name dialog](../assets/images/setup-profile-name.png)
 
-and
-
-![Screenshot: Profile setup ORCID dialog](../assets/images/setup-profile-orcid.png)
-
 ### View Your Profile
 
-**File → Show Nanopub Profile**
+**Zotero → Settings** or **Edit → Settings** (depending on the Zotero version and your Operating System).
 
-See your current:
+- Click on **View Profile** to see your current:
 - Name
 - ORCID
-
 
 ![Screenshot: View Profile setup ORCID](../assets/images/profile-orcid.png)
 
@@ -132,6 +128,7 @@ The notes include:
 ### Theme Support
 
 Notes automatically adapt to Zotero's theme:
+
 - ☀️ Light mode: Clean, readable
 - 🌙 Dark mode: Eye-friendly colors
 
@@ -164,7 +161,21 @@ Discover what other researchers have published about papers in your library.
 
 ---
 
-## 6. Import Nanopublications
+## 6. Integration with Zotero PDFViewer to annotate quotation
+
+You can create nanopublications directly from the Zotero's PDF viewer:
+- Select text directly in PDFs
+- Create annotation from the highlighted passage
+- Right-click from the note in the PDFViwer to create a nanopublication.
+
+
+Check the video below to view the entire workflow step by step:
+
+<iframe width="760" height="560" src="https://www.youtube.com/embed/X5BDU0N5sC4" frameborder="0" allowfullscreen></iframe>
+
+---
+
+## 7. Import Nanopublications
 
 Add existing nanopubs from the network to your Zotero library.
 
@@ -178,6 +189,7 @@ Add existing nanopubs from the network to your Zotero library.
 4. Rich note included
 
 **Use when:**
+
 - Building a collection of nanopubs
 - Tracking semantic statements
 - Creating a nanopub library
@@ -195,13 +207,14 @@ Or:
 3. Plugin fetches and attaches as a rich note
 
 **Use when:**
+
 - Linking related nanopubs to papers
 - Organizing annotations by paper
 - Building context around specific items
 
 ---
 
-## 7. ORCID Authentication
+## 8. ORCID Authentication
 
 Your nanopublications are cryptographically signed with your ORCID for:
 - Proper attribution
@@ -221,17 +234,11 @@ Your nanopublications are cryptographically signed with your ORCID for:
 
 ---
 
-## Coming Soon in v2.1
+## Coming Soon in v0.1.4
 
-🚧 **PDF Text Selection**
+🚧 **Better display and more nanopublication templates!**
 
-We're working on direct integration with Zotero's PDF viewer:
-- Select text directly in PDFs
-- Create nanopubs from highlighted passages
-- Quote specific sections with attribution
-- One-click workflow from highlight to nanopub
-
-**Current workaround:** Copy text from PDFs and paste into form fields when creating nanopubs.
+We're working on refactoring the complete zotero plugin to make it easier for end-users to create new nanopublications and to integrate new nanopublication templates.
 
 [Follow development →](https://github.com/ScienceLiveHub/zotero-nanopub-plugin)
 
@@ -262,6 +269,7 @@ We're working on direct integration with Zotero's PDF viewer:
 - ORCID account (free at https://orcid.org)
 
 **Supported platforms:**
+
 - Windows 10/11
 - macOS 11+ (Intel and Apple Silicon)
 - Linux (Ubuntu 20.04+, Fedora 34+)

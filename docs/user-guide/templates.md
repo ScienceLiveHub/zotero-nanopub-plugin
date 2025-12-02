@@ -6,17 +6,76 @@ Choose the right template for your semantic statement. All templates are loaded 
 
 | Template | Icon | Best For | Complexity |
 |----------|------|----------|------------|
-| **Research Summary (CiTO)** | 📝 | Paper relationships & comments | Easy |
+| **Citation with CiTO** | 📝 | Paper relationships | Easy |
+| **Comment on a paper** | 📝 | Add personal comments on a paper | Easy |
+| **Annotate a paper quotation** | 📝 | Add personal comments/notes attached to a paper quotation | Easy when used from Zotero PDFViwer |
 | **Scientific Claim (AIDA)** | 🔬 | Formal research assertions | Medium |
 | **Geographical Coverage** | 🌍 | Document the geographical area or region covered by the study. | Medium |
 
 ---
 
-## Research Summary (CiTO)
+## Citation with CiTO
 
 ### What is CiTO?
 
 CiTO (Citation Typing Ontology) provides structured ways to describe **why** you're citing a paper, not just **that** you cited it.
+
+### When to Use
+Use it if you do not need to add a personal comment e.g. when the options in the dropdown menu are sufficient to explain why you are citing this paper.
+
+When you select this template, the form in Zotero includes:
+
+**1. Article Being Cited** 
+
+- DOI or URI
+- Citation string
+
+**2. Relationship Type** (dropdown)
+Choose from CiTO relationships:
+
+**Agreement & Support:**
+
+- `agrees_with` - I agree with statements in this paper
+- `confirms` - I confirm findings from this paper
+- `supports` - I provide supporting evidence
+
+**Extension & Building:**
+
+- `extends` - I extend ideas from this paper
+- `updates` - I update information in this paper
+
+**Critique:**
+
+- `critiques` - I critique this paper
+- `disagrees_with` - I disagree with this paper
+- `disputes` - I dispute claims in this paper
+
+**Methods & Data:**
+
+- `uses_method_in` - I use methods from this paper
+- `uses_data_from` - I use data from this paper
+
+**Discussion:**
+
+- `discusses` - I discuss this paper
+- `reviews` - I review this paper
+
+### Example Workflow
+
+**Scenario:** You read a paper and agrees with it
+
+1. Select paper in Zotero: "Heat-related mortality amplified during the COVID-19 pandemic"
+2. Right-click → Create Nanopublication → 📝 Citation with CiTO
+3. Form opens with paper DOI pre-filled
+4. Choose relationship: `agrees with - agrees with statements, ideas or conclusions presented in the cited entity`
+
+Check our video to see it in action:
+
+<iframe width="760" height="560" src="https://www.youtube.com/embed/N4swx_7GXRU" frameborder="0" allowfullscreen></iframe>
+
+## Comment on a paper
+
+It also uses CiTO to qualify **why** you're citing a paper but you can also add a personal comment from the paper.
 
 ### When to Use
 
@@ -31,33 +90,12 @@ CiTO (Citation Typing Ontology) provides structured ways to describe **why** you
 When you select this template, the form in Zotero includes:
 
 **1. Article Being Cited** 
+
 - DOI or URI
 - Citation string
 
 **2. Relationship Type** (dropdown)
-Choose from CiTO relationships:
-
-**Agreement & Support:**
-- `agrees_with` - I agree with statements in this paper
-- `confirms` - I confirm findings from this paper
-- `supports` - I provide supporting evidence
-
-**Extension & Building:**
-- `extends` - I extend ideas from this paper
-- `updates` - I update information in this paper
-
-**Critique:**
-- `critiques` - I critique this paper
-- `disagrees_with` - I disagree with this paper
-- `disputes` - I dispute claims in this paper
-
-**Methods & Data:**
-- `uses_method_in` - I use methods from this paper
-- `uses_data_from` - I use data from this paper
-
-**Discussion:**
-- `discusses` - I discuss this paper
-- `reviews` - I review this paper
+Choose from CiTO relationships (see CiTO example above).
 
 **3. Your Comment** (text area)
 Explain your relationship in natural language.
@@ -66,24 +104,23 @@ Explain your relationship in natural language.
 
 **Scenario:** You're reviewing a machine learning paper
 
-1. Select paper in Zotero: "Deep Learning for Genomics"
-2. Right-click → Create Nanopublication → 📝 Research Summary
+1. Select paper in Zotero: "Galaxy: A Decade of Realising CWFR Concepts" (DOI: 10.1162/dint_a_00136)
+2. Right-click → Create Nanopublication →  Comment on a paper
 3. Form opens with paper info pre-filled
-4. Choose relationship: `extends`
-5. Add comment:
+4. Choose relationship: `uses conclusions from`
+5. Add text:
 
 ```
-This paper extends the methodology to a new dataset
-of marine organisms. The same neural network architecture
-is applied successfully to fish genome classification,
-achieving 94% accuracy.
+The paper explains that most tools do not have sufficient metadata and advocate for the usage of ontologies such as the EDAM Ontology to annotate tools and workflows.
 ```
 
-6. Click "Create & Publish"
+6. Click "Create Nanopublication"
 7. Done! A rich note is attached to the paper.
 
-**Result:** A semantic statement saying "My work extends this paper by applying it to marine genomics."
+**Result:** A semantic statement saying "I uses conclusions `The paper explains that most tools do not have sufficient metadata and advocate for the usage of ontologies such as the EDAM Ontology to annotate tools and workflows.` from https://doi.org/10.1162/dint_a_00136"
 
+
+![Nanopub Zotero plugin Comment on paper](../assets/images/comment-form.png)
 ---
 
 ## Scientific Claim (AIDA)
@@ -106,21 +143,30 @@ AIDA statements are structured scientific claims that are:
 
 ### Form Fields
 
-**1. Subject** - What the claim is about
-- Example: "Protein ABC"
-- Can be a URI or text
+**1. AIDA Sentence** - The AIDA Sentence
+
+- Example: "ImageNet introduces a revolutionary 3.2-million image database with 99.7% accuracy across 5,247 hierarchical categories, offering computer vision researchers an unprecedented training resource that's 100× larger than existing datasets and freely available at image-net.org."
+
+**2. Subject** - What the claim is about
+
+- Example: "ImageNet" (http://www.wikidata.org/entity/Q24901201)
+- Is a URI (Wikidata)
 
 **2. Predicate** - The relationship or property
+
 - Example: "interacts_with"
 - Often a URI from an ontology
 
 **3. Object** - What it relates to
+
 - Example: "Protein XYZ"
 
 **4. Context** (optional) - Conditions and qualifiers
+
 - Example: "in human HeLa cells at pH 7.4"
 
 **5. Paper Reference** (auto-filled from selected item)
+
 - Evidence for your claim
 
 ![Screenshot: AIDA template form in Zotero]
@@ -132,10 +178,12 @@ AIDA statements are structured scientific claims that are:
 1. Select paper in Zotero (your own paper or source paper)
 2. Right-click → Create Nanopublication → 🔬 Scientific Claim
 3. Fill form:
+
    - **Subject:** `http://purl.uniprot.org/uniprot/P12345` (Protein A)
    - **Predicate:** `http://purl.obolibrary.org/obo/RO_0002436` (interacts_with)
    - **Object:** `http://purl.uniprot.org/uniprot/Q67890` (Protein B)
    - **Context:** "Observed in HeLa cells under standard conditions"
+
 4. Click "Create & Publish"
 
 **Result:** A machine-readable claim:
@@ -170,18 +218,22 @@ The Geographical Coverage template allows you to document the geographical area,
 ### Use Cases
 
 **Environmental Research:**
+
 - "This paper studies deforestation in the Amazon Basin"
 - "Data collected from the Arctic Circle region"
 
 **Social Science:**
+
 - "Survey conducted in Northern Europe"
 - "Study covers urban areas in Southeast Asia"
 
 **Earth Science:**
+
 - "Geological samples from the Langhe region, Italy"
 - "Climate data for the Mediterranean Basin"
 
 **Biodiversity:**
+
 - "Species observations in the Great Barrier Reef"
 - "Forest inventory covering Scandinavia"
 
@@ -191,6 +243,7 @@ When you select this template, the form in Zotero includes:
 
 #### **1. Paper Reference**
 The research paper, dataset, or study being documented:
+
 - DOI or URI
 - Title and citation information
 - Pre-filled from your selected Zotero item
@@ -201,11 +254,13 @@ The research paper, dataset, or study being documented:
 
 #### **2. Location Identifier** (required)
 A unique identifier for the geographical area:
+
 - Creates a URI for the location
 - Use lowercase with hyphens
 - Should be descriptive and memorable
 
 **Examples:**
+
 - `amazon-basin`
 - `langhe-region-italy`
 - `northern-europe`
@@ -216,11 +271,13 @@ A unique identifier for the geographical area:
 
 #### **3. Name of Geographical Area** (required)
 The human-readable name of the location:
+
 - Use proper capitalization
 - Include country/region context if needed
 - Be as specific as necessary
 
 **Examples:**
+
 - "Amazon Basin"
 - "Langhe region, Italy"
 - "Northern Europe"
@@ -235,11 +292,13 @@ The human-readable name of the location:
 For precise spatial definitions, you can provide geometry coordinates:
 
 **Geometry Identifier:**
+
 - Identifier for the geometry object
 - Auto-filled as `{location-id}-geometry`
 - Example: `langhe-region-italy-geometry`
 
 **WKT Coordinates:**
+
 - Well-Known Text format
 - Enables spatial queries
 - Supports points, lines, and polygons

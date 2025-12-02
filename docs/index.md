@@ -40,24 +40,25 @@ The Zotero Nanopublication Plugin brings semantic web publishing **directly into
 
 ---
 
-## Current Features (v2.0.0)
+## Current Features (v0.1.3)
 
 - **In-Zotero Form Creation** - Entire workflow happens in Zotero tabs
 - **Template Browser** - Choose from popular templates with one click
-- **Multiple Templates** - CiTO, AIDA, geographical coverage, and more
+- **Multiple Templates** - CiTO, AIDA, quote & annotate, geographical coverage, and more
 - **Auto-fill** - Paper metadata automatically populated
 - **Automatic Signing** - Uses WASM cryptography with your ORCID
 - **Direct Publishing** - Publishes to nanopub network instantly
 - **Rich Notes** - Beautiful display of nanopubs with `@sciencelivehub/nanopub-view`
 - **Search Integration** - Discover nanopubs about papers in your library
 - **Import/Attach** - Add nanopubs as items or attach as notes
+- **PDF Text Selection** - Create nanopubs directly from highlighted text
 - **Dark Mode** - Seamless integration with Zotero's theme
 
 ---
 
-## Coming Soon (v2.1.0)
+## Coming Soon (v0.1.4)
 
-🚧 **PDF Text Selection** - Create nanopubs directly from highlighted text
+🚧 **PRISMA Systematic Review** - Create nanopubs for Systematic Reviews from Zotero
 
 Want updates? [Watch the repository](https://github.com/ScienceLiveHub/zotero-nanopub-plugin) ⭐
 
