@@ -41,8 +41,7 @@ nav:
     - Template Types: user-guide/templates.md
     - PDF Annotations: user-guide/pdf-annotations.md
     - Search & Discovery: user-guide/search-discovery.md
-  - Examples:
-    - Systematic Review: examples/systematic-review.md
+  - Videos:
     - Video Tutorials: examples/video-tutorials.md
   - Technical:
     - Architecture: technical/architecture.md
