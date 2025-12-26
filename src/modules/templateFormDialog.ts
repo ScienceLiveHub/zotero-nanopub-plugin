@@ -1042,10 +1042,13 @@ private static fillFieldByName(container: HTMLElement, fieldName: string, value:
         const idMatch = displayUri.match(/\/np\/([A-Za-z0-9_-]+)/);
         if (idMatch) {
           displayUri = `https://w3id.org/np/${idMatch[1]}`;
+        } else if (/^[A-Za-z0-9_-]+$/.test(displayUri)) {
+          // Handle case where result.uri is just the ID
+          displayUri = `https://w3id.org/np/${displayUri}`;
         }
       }
 
-      const nanodashUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(displayUri)}`;
+      const nanodashUrl = `https://platform.sciencelive4all.org/np/?uri=${encodeURIComponent(displayUri)}`;
       
       const message = 
         `Successfully created and published!\n\n` +

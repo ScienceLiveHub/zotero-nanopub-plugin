@@ -71,7 +71,7 @@ export class NanopubDisplay {
             <a href="${nanopubUri}" target="_blank" style="color: inherit; text-decoration: underline;">${nanopubUri}</a>
           </div>
           <div style="font-size: 11px;">
-            <a href="https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(nanopubUri)}" target="_blank" style="color: inherit; text-decoration: underline;">🔍 Explore this nanopublication</a>
+            <a href="https://platform.sciencelive4all.org/np/?uri=${encodeURIComponent(nanopubUri)}" target="_blank" style="color: inherit; text-decoration: underline;">🔍 Explore this nanopublication</a>
           </div>
         </div>
       `;
@@ -192,7 +192,7 @@ export class NanopubDisplay {
             <a href="${nanopubUri}" target="_blank" style="color: inherit; text-decoration: underline;">${nanopubUri}</a>
           </div>
           <div style="font-size: 11px;">
-            <a href="https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(nanopubUri)}" target="_blank" style="color: inherit; text-decoration: underline;">🔍 Explore this nanopublication</a>
+            <a href="https://platform.sciencelive4all.org/np/?uri=${encodeURIComponent(nanopubUri)}" target="_blank" style="color: inherit; text-decoration: underline;">🔍 Explore this nanopublication</a>
           </div>
         </div>
       `;

@@ -76,7 +76,7 @@ export class NanopubCreationDialog {
       progressWin.close();
 
       // Success!
-      const viewUrl = `https://nanodash.knowledgepixels.com/explore?id=${encodeURIComponent(result.uri)}`;
+      const viewUrl = `https://platform.sciencelive4all.org/np/?uri=${encodeURIComponent(result.uri)}`;
       
       const message = `Successfully created and published!\n\n` +
         `URI: ${result.uri}\n\n` +
